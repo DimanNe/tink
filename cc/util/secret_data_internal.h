@@ -52,7 +52,7 @@ struct SanitizingAllocator {
 
   // Allocator requirements mandate definition of eq and neq operators
   bool operator==(const SanitizingAllocator&) { return true; }
-  bool operator!=(const SanitizingAllocator&) { return false; }
+  // bool operator!=(const SanitizingAllocator&) { return false; }
 };
 
 template <typename T>
