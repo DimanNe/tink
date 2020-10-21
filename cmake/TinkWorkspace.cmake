@@ -36,59 +36,61 @@ include(TinkUtil)
 
 set(gtest_force_shared_crt ON CACHE BOOL "Tink dependency override" FORCE)
 
-http_archive(
-  NAME com_google_googletest
-  URL https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.zip
-  SHA256 a7db7d1295ce46b93f3d1a90dbbc55a48409c00d19684fcd87823037add88118
-)
+#http_archive(
+#  NAME com_google_googletest
+#  URL https://github.com/google/googletest/archive/eb9225ce361affe561592e0912320b9db84985d0.zip
+#  SHA256 a7db7d1295ce46b93f3d1a90dbbc55a48409c00d19684fcd87823037add88118
+#)
 
-http_archive(
-  NAME com_google_absl
-  URL https://github.com/abseil/abseil-cpp/archive/db5773a721a50d1fc8c9b51efea0e70be4003d36.zip
-  SHA256 83be4b9b919c3fe7574e49782ab924d5ac59f266f1e93c4e5fddf8a5fca43361
-)
+#http_archive(
+#  NAME com_google_absl
+#  URL https://github.com/abseil/abseil-cpp/archive/db5773a721a50d1fc8c9b51efea0e70be4003d36.zip
+#  SHA256 83be4b9b919c3fe7574e49782ab924d5ac59f266f1e93c4e5fddf8a5fca43361
+#)
 
-http_archive(
-  NAME wycheproof
-  URL https://github.com/google/wycheproof/archive/f89f4c53a8845fcefcdb9f14ee9191dbe167e3e3.zip
-  SHA256 b44bb0339ad149e6cdab1337445cf52440cbfc79684203a3db1c094d9ef8daea
-  DATA_ONLY
-)
+#http_archive(
+#  NAME wycheproof
+#  URL https://github.com/google/wycheproof/archive/f89f4c53a8845fcefcdb9f14ee9191dbe167e3e3.zip
+#  SHA256 b44bb0339ad149e6cdab1337445cf52440cbfc79684203a3db1c094d9ef8daea
+#  DATA_ONLY
+#)
 
 # Symlink the Wycheproof test data.
 # Paths are hard-coded in tests, which expects wycheproof/ in this location.
-add_directory_alias("${wycheproof_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/cc/wycheproof")
+#add_directory_alias("${wycheproof_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/cc/wycheproof")
 
-http_archive(
-  NAME boringssl
-  URL https://github.com/google/boringssl/archive/597b810379e126ae05d32c1d94b1a9464385acd0.zip
-  SHA256 c4e8414cb36e62d2fee451296cc864f7ad1a4670396c8a67e1ee77ae84cc4167
-  CMAKE_SUBDIR src
-)
+#http_archive(
+#  NAME boringssl
+#  URL https://github.com/google/boringssl/archive/597b810379e126ae05d32c1d94b1a9464385acd0.zip
+#  SHA256 c4e8414cb36e62d2fee451296cc864f7ad1a4670396c8a67e1ee77ae84cc4167
+#  CMAKE_SUBDIR src
+#)
 
 # BoringSSL targets do not carry include directory info, this fixes it.
+set(boringssl_SOURCE_DIR ${CMAKE_SOURCE_DIR}/contrib/boringssl/boringssl)
 target_include_directories(crypto PUBLIC "${boringssl_SOURCE_DIR}/src/include")
 
 set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "Tink dependency override" FORCE)
 set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "Tink dependency override" FORCE)
 set(RAPIDJSON_BUILD_TESTS OFF CACHE BOOL "Tink dependency override" FORCE)
 
-http_archive(
-  NAME rapidjson
-  URL https://github.com/Tencent/rapidjson/archive/v1.1.0.tar.gz
-  SHA256 bf7ced29704a1e696fbccf2a2b4ea068e7774fa37f6d7dd4039d0787f8bed98e
-)
+#http_archive(
+#  NAME rapidjson
+#  URL https://github.com/Tencent/rapidjson/archive/v1.1.0.tar.gz
+#  SHA256 bf7ced29704a1e696fbccf2a2b4ea068e7774fa37f6d7dd4039d0787f8bed98e
+#)
 
 # Rapidjson is a header-only library with no explicit target. Here we create one.
 add_library(rapidjson INTERFACE)
+set(rapidjson_SOURCE_DIR ${CMAKE_SOURCE_DIR}/contrib/rapidjson/rapidjson)
 target_include_directories(rapidjson INTERFACE "${rapidjson_SOURCE_DIR}")
 
 set(protobuf_BUILD_TESTS OFF CACHE BOOL "Tink dependency override" FORCE)
 set(protobuf_BUILD_EXAMPLES OFF CACHE BOOL "Tink dependency override" FORCE)
 
-http_archive(
-  NAME com_google_protobuf
-  URL https://github.com/google/protobuf/archive/v3.11.4.zip
-  SHA256 9748c0d90e54ea09e5e75fb7fac16edce15d2028d4356f32211cfa3c0e956564
-  CMAKE_SUBDIR cmake
-)
+#http_archive(
+#  NAME com_google_protobuf
+#  URL https://github.com/google/protobuf/archive/v3.11.4.zip
+#  SHA256 9748c0d90e54ea09e5e75fb7fac16edce15d2028d4356f32211cfa3c0e956564
+#  CMAKE_SUBDIR cmake
+#)

@@ -568,19 +568,6 @@ tink_cc_library(
 )
 
 tink_cc_library(
-  NAME wycheproof_util
-  SRCS
-    wycheproof_util.cc
-    wycheproof_util.h
-  DEPS
-    tink::subtle::common_enums
-    tink::util::status
-    tink::util::statusor
-    absl::strings
-    rapidjson
-)
-
-tink_cc_library(
   NAME stream_segment_decrypter
   SRCS stream_segment_decrypter.h
   DEPS tink::util::status
@@ -773,6 +760,21 @@ tink_cc_library(
 )
 
 # tests
+
+if (TINK_BUILD_TESTS)
+
+tink_cc_library(
+  NAME wycheproof_util
+  SRCS
+    wycheproof_util.cc
+    wycheproof_util.h
+  DEPS
+    tink::subtle::common_enums
+    tink::util::status
+    tink::util::statusor
+    absl::strings
+    rapidjson
+)
 
 tink_cc_test(
   NAME ecies_hkdf_recipient_kem_boringssl_test
@@ -1376,3 +1378,4 @@ tink_cc_test(
     absl::strings
     crypto
 )
+endif()
