@@ -68,7 +68,7 @@ set(gtest_force_shared_crt ON CACHE BOOL "Tink dependency override" FORCE)
 
 # BoringSSL targets do not carry include directory info, this fixes it.
 set(boringssl_SOURCE_DIR ${CMAKE_SOURCE_DIR}/contrib/boringssl/boringssl)
-target_include_directories(crypto PUBLIC "${boringssl_SOURCE_DIR}/src/include")
+target_include_directories(crypto PUBLIC "${boringssl_SOURCE_DIR}/include")
 
 set(RAPIDJSON_BUILD_DOC OFF CACHE BOOL "Tink dependency override" FORCE)
 set(RAPIDJSON_BUILD_EXAMPLES OFF CACHE BOOL "Tink dependency override" FORCE)
