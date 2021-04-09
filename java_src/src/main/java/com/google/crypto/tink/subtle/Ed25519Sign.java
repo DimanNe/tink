@@ -17,6 +17,7 @@
 package com.google.crypto.tink.subtle;
 
 import com.google.crypto.tink.PublicKeySign;
+import com.google.crypto.tink.config.TinkFips;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 
@@ -35,6 +36,8 @@ import java.util.Arrays;
  * @since 1.1.0
  */
 public final class Ed25519Sign implements PublicKeySign {
+  public static final TinkFips.AlgorithmFipsCompatibility FIPS =
+      TinkFips.AlgorithmFipsCompatibility.ALGORITHM_NOT_FIPS;
 
   public static final int SECRET_KEY_LEN = Field25519.FIELD_LEN;
 
@@ -49,6 +52,10 @@ public final class Ed25519Sign implements PublicKeySign {
    *     EngineFactory}.MESSAGE_DIGEST.
    */
   public Ed25519Sign(final byte[] privateKey) throws GeneralSecurityException {
+    if (!FIPS.isCompatible()) {
+      throw new GeneralSecurityException("Can not use Ed25519 in FIPS-mode.");
+    }
+
     if (privateKey.length != SECRET_KEY_LEN) {
       throw new IllegalArgumentException(
           String.format("Given private key's length is not %s", SECRET_KEY_LEN));
@@ -84,7 +91,16 @@ public final class Ed25519Sign implements PublicKeySign {
 
     /** Returns a new <publicKey, privateKey> KeyPair. */
     public static KeyPair newKeyPair() throws GeneralSecurityException {
-      byte[] privateKey = Random.randBytes(Field25519.FIELD_LEN);
+      return newKeyPairFromSeed(Random.randBytes(Field25519.FIELD_LEN));
+    }
+
+    /** Returns a new <publicKey, privateKey> KeyPair generated from a seed. */
+    public static KeyPair newKeyPairFromSeed(byte[] secretSeed) throws GeneralSecurityException {
+      if (secretSeed.length != Field25519.FIELD_LEN) {
+        throw new IllegalArgumentException(
+            String.format("Given secret seed length is not %s", Field25519.FIELD_LEN));
+      }
+      byte[] privateKey = secretSeed;
       byte[] publicKey = Ed25519.scalarMultWithBaseToBytes(Ed25519.getHashedScalar(privateKey));
       return new KeyPair(publicKey, privateKey);
     }

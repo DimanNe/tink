@@ -17,7 +17,7 @@
 package com.google.crypto.tink.daead;
 
 import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertThrows;
 
 import com.google.crypto.tink.DeterministicAead;
 import com.google.crypto.tink.KeyTemplate;
@@ -29,6 +29,7 @@ import com.google.crypto.tink.subtle.Random;
 import com.google.crypto.tink.testing.TestUtil;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ExtensionRegistryLite;
+import java.io.ByteArrayInputStream;
 import java.security.GeneralSecurityException;
 import java.util.TreeSet;
 import javax.crypto.Cipher;
@@ -49,54 +50,45 @@ public class AesSivKeyManagerTest {
 
   @Test
   public void validateKeyFormat_empty() throws Exception {
-    try {
-      new AesSivKeyManager().keyFactory().validateKeyFormat(AesSivKeyFormat.getDefaultInstance());
-      fail();
-    } catch (GeneralSecurityException e) {
-      // expected
-    }
+    assertThrows(
+        GeneralSecurityException.class,
+        () ->
+            new AesSivKeyManager()
+                .keyFactory()
+                .validateKeyFormat(AesSivKeyFormat.getDefaultInstance()));
   }
 
   @Test
   public void validateKeyFormat_checkAllLengths() throws Exception {
     AesSivKeyManager manager = new AesSivKeyManager();
-    for (int i = 0; i < 100; i++) {
+    for (int j = 0; j < 100; j++) {
+      final int i = j;
       if (i == 64) {
         manager.keyFactory().validateKeyFormat(createAesSivKeyFormat(i));
       } else {
-        try {
-          manager.keyFactory().validateKeyFormat(createAesSivKeyFormat(i));
-          fail();
-        } catch (GeneralSecurityException e) {
-          // expected
-        }
+        assertThrows(
+            GeneralSecurityException.class,
+            () -> manager.keyFactory().validateKeyFormat(createAesSivKeyFormat(i)));
       }
     }
   }
 
   @Test
   public void validateKey_empty() throws Exception {
-    try {
-      new AesSivKeyManager().validateKey(AesSivKey.getDefaultInstance());
-      fail();
-    } catch (GeneralSecurityException e) {
-      // expected
-    }
+    assertThrows(
+        GeneralSecurityException.class,
+        () -> new AesSivKeyManager().validateKey(AesSivKey.getDefaultInstance()));
   }
 
   @Test
   public void validateKey_checkAllLengths() throws Exception {
     AesSivKeyManager manager = new AesSivKeyManager();
-    for (int i = 0; i < 100; i++) {
+    for (int j = 0; j < 100; j++) {
+      final int i = j;
       if (i == 64) {
         manager.validateKey(createAesSivKey(i));
       } else {
-        try {
-          manager.validateKey(createAesSivKey(i));
-          fail();
-        } catch (GeneralSecurityException e) {
-          // expected
-        }
+        assertThrows(GeneralSecurityException.class, () -> manager.validateKey(createAesSivKey(i)));
       }
     }
   }
@@ -104,12 +96,9 @@ public class AesSivKeyManagerTest {
   @Test
   public void validateKey_version() throws Exception {
     AesSivKeyManager manager = new AesSivKeyManager();
-    try {
-      manager.validateKey(AesSivKey.newBuilder(createAesSivKey(64)).setVersion(1).build());
-      fail();
-    } catch (GeneralSecurityException e) {
-      // expected
-    }
+    assertThrows(
+        GeneralSecurityException.class,
+        () -> manager.validateKey(AesSivKey.newBuilder(createAesSivKey(64)).setVersion(1).build()));
   }
 
   @Test
@@ -138,6 +127,50 @@ public class AesSivKeyManagerTest {
       keys.add(TestUtil.hexEncode(factory.createKey(format).toByteArray()));
     }
     assertThat(keys).hasSize(numKeys);
+  }
+
+  @Test
+  public void testDeriveKey() throws Exception {
+    final int keySize = 64;
+    byte[] keyMaterial = Random.randBytes(100);
+    AesSivKey key =
+        new AesSivKeyManager()
+            .keyFactory()
+            .deriveKey(
+                AesSivKeyFormat.newBuilder().setVersion(0).setKeySize(keySize).build(),
+                new ByteArrayInputStream(keyMaterial));
+    assertThat(key.getKeyValue()).hasSize(keySize);
+    for (int i = 0; i < keySize; ++i) {
+      assertThat(key.getKeyValue().byteAt(i)).isEqualTo(keyMaterial[i]);
+    }
+  }
+
+  @Test
+  public void testDeriveKeyNotEnoughRandomness() throws Exception {
+    final int keySize = 64;
+    byte[] keyMaterial = Random.randBytes(10);
+    assertThrows(
+        GeneralSecurityException.class,
+        () ->
+            new AesSivKeyManager()
+                .keyFactory()
+                .deriveKey(
+                    AesSivKeyFormat.newBuilder().setVersion(0).setKeySize(keySize).build(),
+                    new ByteArrayInputStream(keyMaterial)));
+  }
+
+  @Test
+  public void testDeriveKeyWrongVersion() throws Exception {
+    final int keySize = 64;
+    byte[] keyMaterial = Random.randBytes(64);
+    assertThrows(
+        GeneralSecurityException.class,
+        () ->
+            new AesSivKeyManager()
+                .keyFactory()
+                .deriveKey(
+                    AesSivKeyFormat.newBuilder().setVersion(1).setKeySize(keySize).build(),
+                    new ByteArrayInputStream(keyMaterial)));
   }
 
   @Test

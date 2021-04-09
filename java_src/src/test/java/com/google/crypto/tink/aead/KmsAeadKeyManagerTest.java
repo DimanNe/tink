@@ -16,14 +16,18 @@
 
 package com.google.crypto.tink.aead;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import com.google.crypto.tink.Aead;
+import com.google.crypto.tink.KeyTemplate;
 import com.google.crypto.tink.KeysetHandle;
-import com.google.crypto.tink.KmsClient;
 import com.google.crypto.tink.KmsClients;
-import com.google.crypto.tink.integration.gcpkms.GcpKmsClient;
+import com.google.crypto.tink.proto.KmsAeadKeyFormat;
+import com.google.crypto.tink.subtle.Random;
+import com.google.crypto.tink.testing.FakeKmsClient;
 import com.google.crypto.tink.testing.TestUtil;
+import com.google.protobuf.ExtensionRegistryLite;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -33,18 +37,48 @@ import org.junit.runners.JUnit4;
 public class KmsAeadKeyManagerTest {
   @Before
   public void setUp() throws Exception {
-    KmsClient kmsClient = new GcpKmsClient().withCredentials(TestUtil.SERVICE_ACCOUNT_FILE);
-    KmsClients.add(kmsClient);
+    KmsClients.add(new FakeKmsClient());
     AeadConfig.register();
   }
 
-  // TODO(b/154273145): re-enable this.
-  @Ignore
   @Test
-  public void testGcpKmsKeyRestricted() throws Exception {
+  public void testKmsAeadWithBoundedClient_success() throws Exception {
+    String keyUri = FakeKmsClient.createFakeKeyUri();
     KeysetHandle keysetHandle =
-        KeysetHandle.generateNew(
-            AeadKeyTemplates.createKmsAeadKeyTemplate(TestUtil.RESTRICTED_CRYPTO_KEY_URI));
+        KeysetHandle.generateNew(AeadKeyTemplates.createKmsAeadKeyTemplate(keyUri));
     TestUtil.runBasicAeadTests(keysetHandle.getPrimitive(Aead.class));
+  }
+
+  @Test
+  public void createKeyTemplate() throws Exception {
+    // Intentionally using "weird" or invalid values for parameters,
+    // to test that the function correctly puts them in the resulting template.
+    String keyUri = "some example KEK URI";
+    KeyTemplate template = KmsAeadKeyManager.createKeyTemplate(keyUri);
+    assertThat(new KmsAeadKeyManager().getKeyType()).isEqualTo(template.getTypeUrl());
+    assertThat(KeyTemplate.OutputPrefixType.RAW).isEqualTo(template.getOutputPrefixType());
+
+    KmsAeadKeyFormat format =
+        KmsAeadKeyFormat.parseFrom(template.getValue(), ExtensionRegistryLite.getEmptyRegistry());
+    assertThat(keyUri).isEqualTo(format.getKeyUri());
+  }
+
+  @Test
+  public void createKeyTemplate_multipleKeysWithSameKek() throws Exception {
+    String keyUri = FakeKmsClient.createFakeKeyUri();
+
+    KeyTemplate template1 = KmsAeadKeyManager.createKeyTemplate(keyUri);
+    KeysetHandle handle1 = KeysetHandle.generateNew(template1);
+    Aead aead1 = handle1.getPrimitive(Aead.class);
+
+    KeyTemplate template2 = KmsAeadKeyManager.createKeyTemplate(keyUri);
+    KeysetHandle handle2 = KeysetHandle.generateNew(template2);
+    Aead aead2 = handle2.getPrimitive(Aead.class);
+
+    byte[] plaintext = Random.randBytes(20);
+    byte[] associatedData = Random.randBytes(20);
+
+    assertThat(aead1.decrypt(aead2.encrypt(plaintext, associatedData), associatedData))
+        .isEqualTo(plaintext);
   }
 }

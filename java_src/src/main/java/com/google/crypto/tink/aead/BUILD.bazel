@@ -90,8 +90,6 @@ java_library(
     deps = [
         ":aead_wrapper",
         "//src/main/java/com/google/crypto/tink:aead",
-        "//src/main/java/com/google/crypto/tink:key_manager",
-        "//src/main/java/com/google/crypto/tink:primitive_set",
         "//src/main/java/com/google/crypto/tink:registry_cluster",
     ],
 )
@@ -103,6 +101,7 @@ java_library(
         "//proto:kms_aead_java_proto",
         "//proto:tink_java_proto",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink:key_template",
         "//src/main/java/com/google/crypto/tink:key_type_manager",
         "//src/main/java/com/google/crypto/tink:kms_client",
         "//src/main/java/com/google/crypto/tink:kms_clients",
@@ -160,6 +159,7 @@ java_library(
         "//proto:kms_envelope_java_proto",
         "//proto:tink_java_proto",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink:key_template",
         "//src/main/java/com/google/crypto/tink:key_type_manager",
         "//src/main/java/com/google/crypto/tink:kms_client",
         "//src/main/java/com/google/crypto/tink:kms_clients",
@@ -233,6 +233,7 @@ java_library(
         ":kms_envelope_aead_key_manager",
         ":x_cha_cha20_poly1305_key_manager",
         "//proto:config_java_proto",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
         "//src/main/java/com/google/crypto/tink/mac:mac_config",
     ],
 )
@@ -325,8 +326,6 @@ android_library(
     deps = [
         ":aead_wrapper-android",
         "//src/main/java/com/google/crypto/tink:aead",
-        "//src/main/java/com/google/crypto/tink:key_manager-android",
-        "//src/main/java/com/google/crypto/tink:primitive_set-android",
         "//src/main/java/com/google/crypto/tink:registry_cluster-android",
     ],
 )
@@ -338,6 +337,7 @@ android_library(
         "//proto:kms_aead_java_proto_lite",
         "//proto:tink_java_proto_lite",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink:key_template",
         "//src/main/java/com/google/crypto/tink:key_type_manager-android",
         "//src/main/java/com/google/crypto/tink:kms_client",
         "//src/main/java/com/google/crypto/tink:kms_clients",
@@ -395,6 +395,7 @@ android_library(
         "//proto:kms_envelope_java_proto_lite",
         "//proto:tink_java_proto_lite",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink:key_template-android",
         "//src/main/java/com/google/crypto/tink:key_type_manager-android",
         "//src/main/java/com/google/crypto/tink:kms_client",
         "//src/main/java/com/google/crypto/tink:kms_clients",
@@ -468,6 +469,7 @@ android_library(
         ":kms_envelope_aead_key_manager-android",
         ":x_cha_cha20_poly1305_key_manager-android",
         "//proto:config_java_proto_lite",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips-android",
         "//src/main/java/com/google/crypto/tink/mac:mac_config-android",
     ],
 )

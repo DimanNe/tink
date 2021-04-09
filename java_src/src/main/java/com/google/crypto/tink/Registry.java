@@ -17,9 +17,7 @@
 package com.google.crypto.tink;
 
 import com.google.crypto.tink.proto.KeyData;
-import com.google.crypto.tink.proto.KeyStatusType;
 import com.google.crypto.tink.proto.KeyTemplate;
-import com.google.crypto.tink.proto.Keyset;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
@@ -297,16 +295,13 @@ public final class Registry {
       @Override
       public KeyData deriveKey(ByteString serializedKeyFormat, InputStream stream)
           throws GeneralSecurityException {
-        KeyTypeManager.KeyFactory<?, KeyProtoT> keyFactory;
-        keyFactory = keyManager.keyFactory();
+        KeyTypeManager.KeyFactory<?, KeyProtoT> keyFactory = keyManager.keyFactory();
         MessageLite keyValue = deriveKeyWithFactory(serializedKeyFormat, stream, keyFactory);
-        KeyData keyData =
-            KeyData.newBuilder()
-                .setTypeUrl(keyManager.getKeyType())
-                .setValue(keyValue.toByteString())
-                .setKeyMaterialType(keyManager.keyMaterialType())
-                .build();
-        return keyData;
+        return KeyData.newBuilder()
+            .setTypeUrl(keyManager.getKeyType())
+            .setValue(keyValue.toByteString())
+            .setKeyMaterialType(keyManager.keyMaterialType())
+            .build();
       }
     };
   }
@@ -357,7 +352,7 @@ public final class Registry {
     }
     if (catalogueMap.containsKey(catalogueName.toLowerCase(Locale.US))) {
       Catalogue<?> existing = catalogueMap.get(catalogueName.toLowerCase(Locale.US));
-      if (!catalogue.getClass().equals(existing.getClass())) {
+      if (!catalogue.getClass().getName().equals(existing.getClass().getName())) {
         logger.warning(
             "Attempted overwrite of a catalogueName catalogue for name " + catalogueName);
         throw new GeneralSecurityException(
@@ -528,7 +523,9 @@ public final class Registry {
       Class<?> existingPublicKeyManagerClass =
           keyManagerMap.get(privateTypeUrl).publicKeyManagerClassOrNull();
       if (existingPublicKeyManagerClass != null) {
-        if (!existingPublicKeyManagerClass.equals(publicKeyTypeManager.getClass())) {
+        if (!existingPublicKeyManagerClass
+            .getName()
+            .equals(publicKeyTypeManager.getClass().getName())) {
           logger.warning(
               "Attempted overwrite of a registered key manager for key type "
                   + privateTypeUrl
@@ -626,11 +623,12 @@ public final class Registry {
       @SuppressWarnings("unchecked") // We know that we only inserted objects of the correct type.
       PrimitiveWrapper<?, P> existingWrapper =
           (PrimitiveWrapper<?, P>) primitiveWrapperMap.get(classObject);
-      if (!wrapper.getClass().equals(existingWrapper.getClass())) {
-        logger.warning("Attempted overwrite of a registered SetWrapper for type " + classObject);
+      if (!wrapper.getClass().getName().equals(existingWrapper.getClass().getName())) {
+        logger.warning(
+            "Attempted overwrite of a registered PrimitiveWrapper for type " + classObject);
         throw new GeneralSecurityException(
             String.format(
-                "SetWrapper for primitive (%s) is already registered to be %s, "
+                "PrimitiveWrapper for primitive (%s) is already registered to be %s, "
                     + "cannot be re-registered with %s",
                 classObject.getName(),
                 existingWrapper.getClass().getName(),
@@ -936,66 +934,6 @@ public final class Registry {
   public static <P> P getPrimitive(KeyData keyData, Class<P> primitiveClass)
       throws GeneralSecurityException {
     return getPrimitive(keyData.getTypeUrl(), keyData.getValue(), primitiveClass);
-  }
-
-  /**
-   * Creates a set of primitives corresponding to the keys with status=ENABLED in the keyset given
-   * in {@code keysetHandle}, assuming all the corresponding key managers are present (keys with
-   * status!=ENABLED are skipped).
-   *
-   * <p>The returned set is usually later "wrapped" into a class that implements the corresponding
-   * Primitive-interface.
-   *
-   * @return a PrimitiveSet with all instantiated primitives
-   */
-  public static <P> PrimitiveSet<P> getPrimitives(
-      KeysetHandle keysetHandle, Class<P> primitiveClass) throws GeneralSecurityException {
-    return getPrimitives(keysetHandle, /* customManager= */ null, primitiveClass);
-  }
-
-  /**
-   * Creates a set of primitives corresponding to the keys with status=ENABLED in the keyset given
-   * in {@code keysetHandle}, using {@code customManager} (instead of registered key managers) for
-   * keys supported by it. Keys not supported by {@code customManager} are handled by matching
-   * registered key managers (if present), and keys with status!=ENABLED are skipped.
-   *
-   * <p>This enables custom treatment of keys, for example providing extra context (e.g.,
-   * credentials for accessing keys managed by a KMS), or gathering custom monitoring/profiling
-   * information.
-   *
-   * <p>The returned set is usually later "wrapped" into a class that implements the corresponding
-   * Primitive-interface.
-   *
-   * @return a PrimitiveSet with all instantiated primitives
-   */
-  public static <P> PrimitiveSet<P> getPrimitives(
-      KeysetHandle keysetHandle, final KeyManager<P> customManager, Class<P> primitiveClass)
-      throws GeneralSecurityException {
-    return getPrimitivesInternal(keysetHandle, customManager, checkNotNull(primitiveClass));
-  }
-
-  private static <P> PrimitiveSet<P> getPrimitivesInternal(
-      KeysetHandle keysetHandle, final KeyManager<P> customManager, Class<P> primitiveClass)
-      throws GeneralSecurityException {
-    Util.validateKeyset(keysetHandle.getKeyset());
-    PrimitiveSet<P> primitives = PrimitiveSet.newPrimitiveSet(primitiveClass);
-    for (Keyset.Key key : keysetHandle.getKeyset().getKeyList()) {
-      if (key.getStatus() == KeyStatusType.ENABLED) {
-        P primitive;
-        if (customManager != null && customManager.doesSupport(key.getKeyData().getTypeUrl())) {
-          primitive = customManager.getPrimitive(key.getKeyData().getValue());
-        } else {
-          primitive =
-              getPrimitiveInternal(
-                  key.getKeyData().getTypeUrl(), key.getKeyData().getValue(), primitiveClass);
-        }
-        PrimitiveSet.Entry<P> entry = primitives.addPrimitive(primitive, key);
-        if (key.getKeyId() == keysetHandle.getKeyset().getPrimaryKeyId()) {
-          primitives.setPrimary(entry);
-        }
-      }
-    }
-    return primitives;
   }
 
   /**

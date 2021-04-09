@@ -86,35 +86,17 @@ class AeadPythonTest(parameterized.TestCase):
         output = p2.decrypt(ciphertext, associated_data)
         self.assertEqual(output, plaintext)
       for p2 in unsupported_aeads:
-        with self.assertRaises(tink.TinkError):
-          p2.decrypt(ciphertext, associated_data)
-    for p in unsupported_aeads:
-      with self.assertRaises(tink.TinkError):
-        p.encrypt(b'plaintext', b'associated_data')
-
-  @parameterized.parameters(all_aead_key_template_names())
-  def test_decrypt_modified_ciphertext_fails(self, template_name):
-    """A basic test if the ciphertext is malleable with single bit-flips."""
-    supported_langs = supported_key_types.SUPPORTED_LANGUAGES_BY_TEMPLATE_NAME[
-        template_name]
-    self.assertNotEmpty(supported_langs)
-    template = supported_key_types.KEY_TEMPLATE[template_name]
-    # Take the first supported language to generate the keyset.
-    keyset = testing_servers.new_keyset(supported_langs[0], template)
-    ciphertext = testing_servers.aead(supported_langs[0], keyset).encrypt(
-        b'plaintext', b'aad')
-    for lang in supported_langs:
-      primitive = testing_servers.aead(lang, keyset)
-      for i in range(len(ciphertext) * 8):
-        # flip the ith bit in the ciphertext.
-        modified_ciphertext = bytearray(ciphertext)
-        modified_ciphertext[i // 8] ^= 1 << (i % 8)
         with self.assertRaises(
             tink.TinkError,
-            msg='ciphertext with the %dth bit flipped did not cause a '
-            'decryption error in %s. keyset="%s", modified_ciphertext="%s"' %
-            (i, lang, keyset.hex(), bytes(modified_ciphertext).hex())):
-          primitive.decrypt(bytes(modified_ciphertext), b'aad')
+            msg='Language %s supports AEAD decrypt with %s unexpectedly' %
+            (p2.lang, key_template_name)):
+          p2.decrypt(ciphertext, associated_data)
+    for p in unsupported_aeads:
+      with self.assertRaises(
+          tink.TinkError,
+          msg='Language %s supports AEAD encrypt with %s unexpectedly' % (
+              p.lang, key_template_name)):
+        p.encrypt(b'plaintext', b'associated_data')
 
 
 # If the implementations work fine for keysets with single keys, then key
@@ -122,9 +104,10 @@ class AeadPythonTest(parameterized.TestCase):
 # These wrappers do not depend on the key type, so it should be fine to always
 # test with the same key type. Since the AEAD wrapper needs to treat keys
 # with output prefix RAW differently, we also include such a template for that.
-TEMPLATE = aead.aead_key_templates.AES128_CTR_HMAC_SHA256
-KEY_ROTATION_TEMPLATES = [TEMPLATE,
-                          keyset_builder.raw_template(TEMPLATE)]
+KEY_ROTATION_TEMPLATES = [
+    aead.aead_key_templates.AES128_CTR_HMAC_SHA256,
+    keyset_builder.raw_template(aead.aead_key_templates.AES128_CTR_HMAC_SHA256)
+]
 
 
 def key_rotation_test_cases(

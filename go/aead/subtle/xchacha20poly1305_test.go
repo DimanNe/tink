@@ -17,12 +17,14 @@ package subtle_test
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"testing"
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"github.com/google/tink/go/aead/subtle"
 	"github.com/google/tink/go/subtle/random"
+	"github.com/google/tink/go/testutil"
 )
 
 func TestXChaCha20Poly1305EncryptDecrypt(t *testing.T) {
@@ -192,6 +194,57 @@ func TestXChaCha20Poly1305RandomNonce(t *testing.T) {
 			t.Errorf("TestRandomNonce failed: %v", err)
 		} else {
 			cts[ctHex] = true
+		}
+	}
+}
+
+func TestXChaCha20Poly1305WycheproofCases(t *testing.T) {
+	testutil.SkipTestIfTestSrcDirIsNotSet(t)
+	suite := new(AEADSuite)
+	if err := testutil.PopulateSuite(suite, "xchacha20_poly1305_test.json"); err != nil {
+		t.Fatalf("failed populating suite: %s", err)
+	}
+	for _, group := range suite.TestGroups {
+		if group.KeySize/8 != chacha20poly1305.KeySize {
+			continue
+		}
+		if group.IvSize/8 != chacha20poly1305.NonceSizeX {
+			continue
+		}
+		for _, test := range group.Tests {
+			caseName := fmt.Sprintf("%s-%s:Case-%d", suite.Algorithm, group.Type, test.CaseID)
+			t.Run(caseName, func(t *testing.T) { runXChaCha20Poly1305WycheproofCase(t, test) })
+		}
+	}
+}
+
+func runXChaCha20Poly1305WycheproofCase(t *testing.T, tc *AEADCase) {
+	var combinedCt []byte
+	combinedCt = append(combinedCt, tc.Iv...)
+	combinedCt = append(combinedCt, tc.Ct...)
+	combinedCt = append(combinedCt, tc.Tag...)
+
+	ca, err := subtle.NewXChaCha20Poly1305(tc.Key)
+	if err != nil {
+		t.Fatalf("cannot create new instance of ChaCha20Poly1305: %s", err)
+	}
+
+	_, err = ca.Encrypt(tc.Msg, tc.Aad)
+	if err != nil {
+		t.Fatalf("unexpected encryption error: %s", err)
+	}
+
+	decrypted, err := ca.Decrypt(combinedCt, tc.Aad)
+	if err != nil {
+		if tc.Result == "valid" {
+			t.Errorf("unexpected error: %s", err)
+		}
+	} else {
+		if tc.Result == "invalid" {
+			t.Error("decrypted invalid")
+		}
+		if !bytes.Equal(decrypted, tc.Msg) {
+			t.Error("incorrect decryption")
 		}
 	}
 }

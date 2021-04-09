@@ -42,19 +42,16 @@ tink_cc_proto(
 tink_cc_proto(
   NAME jwt_rsa_ssa_pkcs1_cc_proto
   SRCS jwt_rsa_ssa_pkcs1.proto
-  DEPS tink::proto::common_cc_proto
 )
 
 tink_cc_proto(
   NAME jwt_rsa_ssa_pss_cc_proto
   SRCS jwt_rsa_ssa_pss.proto
-  DEPS tink::proto::common_cc_proto
 )
 
 tink_cc_proto(
   NAME jwt_ecdsa_cc_proto
   SRCS jwt_ecdsa.proto
-  DEPS tink::proto::common_cc_proto
 )
 
 tink_cc_proto(
@@ -179,6 +176,11 @@ tink_cc_proto(
 tink_cc_proto(
   NAME empty_cc_proto
   SRCS empty.proto
+)
+
+tink_cc_proto(
+  NAME test_proto_cc_proto
+  SRCS test_proto.proto
 )
 
 tink_target_group(

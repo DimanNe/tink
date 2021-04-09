@@ -34,6 +34,7 @@ main() {
   if [[ -n "${KOKORO_ROOT:-}" ]] ; then
     install_python3
     cd "${KOKORO_ARTIFACTS_DIR}/git/tink"
+    ./kokoro/copy_credentials.sh
   fi
   (
     cd testing/cc
@@ -61,12 +62,12 @@ main() {
     time bazel test --test_output=errors -- ...
   )
 
-  local testing_dir="${PWD}/testing"
+  local TINK_SRC_PATH="${PWD}"
   (
     cd testing/cross_language
     use_bazel "$(cat .bazelversion)"
     time bazel test \
-      --test_env testing_dir="${testing_dir}" --test_output=errors -- ...
+      --test_env TINK_SRC_PATH="${TINK_SRC_PATH}" --test_output=errors -- ...
   )
 }
 

@@ -16,9 +16,7 @@
 
 package com.google.crypto.tink.streamingaead;
 
-import com.google.crypto.tink.KeyManager;
 import com.google.crypto.tink.KeysetHandle;
-import com.google.crypto.tink.PrimitiveSet;
 import com.google.crypto.tink.Registry;
 import com.google.crypto.tink.StreamingAead;
 import java.security.GeneralSecurityException;
@@ -46,20 +44,7 @@ public final class StreamingAeadFactory {
    */
   public static StreamingAead getPrimitive(KeysetHandle keysetHandle)
       throws GeneralSecurityException {
-    return getPrimitive(keysetHandle, /* keyManager= */ null);
-  }
-
-  /**
-   * @return a StreamingAead primitive from a {@code keysetHandle} and a custom {@code keyManager}.
-   * @throws GeneralSecurityException
-   */
-  public static StreamingAead getPrimitive(
-      KeysetHandle keysetHandle,
-      final KeyManager<StreamingAead> keyManager)
-      throws GeneralSecurityException {
     Registry.registerPrimitiveWrapper(new StreamingAeadWrapper());
-    final PrimitiveSet<StreamingAead> primitives =
-        Registry.getPrimitives(keysetHandle, keyManager, StreamingAead.class);
-    return Registry.wrap(primitives);
+    return keysetHandle.getPrimitive(StreamingAead.class);
   }
 }

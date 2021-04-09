@@ -10,6 +10,7 @@ java_library(
         ":bytes",
         ":subtle_util_cluster",
         ":validators",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
         "//src/main/java/com/google/crypto/tink/prf:prf_set",
         "@maven//:com_google_errorprone_error_prone_annotations",
     ],
@@ -53,6 +54,7 @@ java_library(
         ":random",
         ":subtle_util_cluster",
         ":validators",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 
@@ -140,7 +142,9 @@ java_library(
 java_library(
     name = "ecies_aead_hkdf_dem_helper",
     srcs = ["EciesAeadHkdfDemHelper.java"],
-    deps = ["//src/main/java/com/google/crypto/tink:aead"],
+    deps = [
+        "//src/main/java/com/google/crypto/tink/hybrid/subtle:aead_or_daead",
+    ],
 )
 
 java_library(
@@ -153,6 +157,8 @@ java_library(
         ":subtle_util_cluster",
         ":validators",
         "//src/main/java/com/google/crypto/tink:public_key_verify",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
+        "@maven//:com_google_errorprone_error_prone_annotations",
     ],
 )
 
@@ -163,8 +169,8 @@ java_library(
         ":ecies_aead_hkdf_dem_helper",
         ":ecies_hkdf_sender_kem",
         ":elliptic_curves",
-        "//src/main/java/com/google/crypto/tink:aead",
         "//src/main/java/com/google/crypto/tink:hybrid_encrypt",
+        "//src/main/java/com/google/crypto/tink/hybrid/subtle:aead_or_daead",
     ],
 )
 
@@ -176,13 +182,34 @@ java_library(
         ":enums",
         ":subtle_util_cluster",
         "//src/main/java/com/google/crypto/tink:public_key_sign",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
+        "@maven//:com_google_errorprone_error_prone_annotations",
     ],
 )
 
 java_library(
     name = "validators",
     srcs = ["Validators.java"],
-    deps = [":enums"],
+    deps = [
+        ":enums",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips-android",
+    ],
+)
+
+java_library(
+    name = "selfkeytests_validators",
+    srcs = ["SelfKeyTestValidators.java"],
+    deps = [
+        ":ecdsa_sign_jce",
+        ":ecdsa_verify_jce",
+        ":elliptic_curves",
+        ":enums",
+        ":rsa_ssa_pkcs1_sign_jce",
+        ":rsa_ssa_pkcs1_verify_jce",
+        ":rsa_ssa_pss_sign_jce",
+        ":rsa_ssa_pss_verify_jce",
+        "@com_google_protobuf//:protobuf_javalite",
+    ],
 )
 
 java_library(
@@ -199,6 +226,7 @@ java_library(
         ":prf_aes_cmac",
         ":subtle_util_cluster",
         "//src/main/java/com/google/crypto/tink:deterministic_aead",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 
@@ -232,6 +260,7 @@ java_library(
         ":subtle_util_cluster",
         ":validators",
         "//src/main/java/com/google/crypto/tink:public_key_verify",
+        "@maven//:com_google_errorprone_error_prone_annotations",
     ],
 )
 
@@ -264,6 +293,7 @@ java_library(
         ":subtle_util_cluster",
         ":validators",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 
@@ -280,6 +310,7 @@ java_library(
         ":field25519",
         ":random",
         "//src/main/java/com/google/crypto/tink:public_key_sign",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 
@@ -305,6 +336,7 @@ java_library(
         ":subtle_util_cluster",
         ":validators",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 
@@ -316,6 +348,7 @@ java_library(
         ":field25519",
         ":immutable_byte_array",
         "//src/main/java/com/google/crypto/tink:public_key_verify",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 
@@ -326,6 +359,7 @@ java_library(
         ":cha_cha20_base",
         ":poly1305",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 
@@ -343,6 +377,8 @@ java_library(
         ":subtle_util_cluster",
         ":validators",
         "//src/main/java/com/google/crypto/tink:public_key_sign",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
+        "@maven//:com_google_errorprone_error_prone_annotations",
     ],
 )
 
@@ -366,6 +402,8 @@ java_library(
         ":enums",
         ":subtle_util_cluster",
         "//src/main/java/com/google/crypto/tink:public_key_verify",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
+        "@maven//:com_google_errorprone_error_prone_annotations",
     ],
 )
 
@@ -395,6 +433,7 @@ java_library(
         ":subtle_util_cluster",
         ":validators",
         "//src/main/java/com/google/crypto/tink:public_key_sign",
+        "@maven//:com_google_errorprone_error_prone_annotations",
     ],
 )
 
@@ -408,6 +447,7 @@ java_library(
     srcs = ["PrfHmacJce.java"],
     deps = [
         ":subtle_util_cluster",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
         "//src/main/java/com/google/crypto/tink/prf:prf_set",
         "@maven//:com_google_errorprone_error_prone_annotations",
     ],
@@ -439,8 +479,8 @@ java_library(
         ":ecies_aead_hkdf_dem_helper",
         ":ecies_hkdf_recipient_kem",
         ":elliptic_curves",
-        "//src/main/java/com/google/crypto/tink:aead",
         "//src/main/java/com/google/crypto/tink:hybrid_decrypt",
+        "//src/main/java/com/google/crypto/tink/hybrid/subtle:aead_or_daead",
     ],
 )
 
@@ -482,6 +522,7 @@ java_library(
         ":engine_wrapper",
         ":enums",
         ":validators",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 

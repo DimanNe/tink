@@ -1,4 +1,4 @@
-load("@rules_python//python:defs.bzl", "py_library")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("@tink_py_pip_deps//:requirements.bzl", "requirement")
 
 package(default_visibility = ["//:__subpackages__"])
@@ -92,6 +92,8 @@ py_library(
         "//tink/proto:aes_gcm_py_pb2",
         "//tink/proto:aes_gcm_siv_py_pb2",
         "//tink/proto:common_py_pb2",
+        "//tink/proto:kms_aead_py_pb2",
+        "//tink/proto:kms_envelope_py_pb2",
         "//tink/proto:tink_py_pb2",
     ],
 )
@@ -99,6 +101,9 @@ py_library(
 py_test(
     name = "_aead_key_templates_test",
     srcs = ["_aead_key_templates_test.py"],
+    data = [
+        "@tink_base//testdata/templates",
+    ],
     srcs_version = "PY3",
     deps = [
         ":aead",
@@ -108,7 +113,10 @@ py_test(
         "//tink/proto:aes_gcm_py_pb2",
         "//tink/proto:aes_gcm_siv_py_pb2",
         "//tink/proto:common_py_pb2",
+        "//tink/proto:kms_aead_py_pb2",
+        "//tink/proto:kms_envelope_py_pb2",
         "//tink/proto:tink_py_pb2",
+        "//tink/testing:helper",
     ],
 )
 

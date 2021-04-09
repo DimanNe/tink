@@ -20,7 +20,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
-from typing import Text, Mapping
+from typing import Text, Mapping, Optional
 
 from tink.proto import tink_pb2
 from tink import aead
@@ -30,24 +30,44 @@ from tink import hybrid
 from tink import mac
 from tink import prf
 from tink import signature as pk_signature
+from google.protobuf import text_format
 
 
-def get_tink_src_path():
+def tink_root_path() -> Text:
   """Returns the path to the Tink root directory used for the test enviroment.
 
-     The path must be set in the TINK_SRC_PATH enviroment variable. If Bazel
-     is used the path is derived from the Bazel enviroment variables.
+     The path can be set in the TINK_SRC_PATH enviroment variable. If Bazel
+     is used the path is derived from the Bazel enviroment variables. If that
+     does not work, it generates the root path relative to the __file__ path.
   """
+  root_paths = []
   if 'TINK_SRC_PATH' in os.environ:
-    return os.environ['TINK_SRC_PATH']
-  elif 'TEST_SRCDIR' in os.environ:
+    root_paths.append(os.environ['TINK_SRC_PATH'])
+  if 'TEST_SRCDIR' in os.environ:
     # Bazel enviroment
-    return os.path.join(os.environ['TEST_SRCDIR'], 'tink_base')
+    root_paths.append(os.path.join(os.environ['TEST_SRCDIR'], 'tink_base'))
+    root_paths.append(os.path.join(os.environ['TEST_SRCDIR'],
+                                   'google3/third_party/tink'))
+  for root_path in root_paths:
+    # return the first root path that exists.
+    if os.path.exists(root_path):
+      return root_path
+  raise ValueError('Could not find path to Tink root directory. Make sure that '
+                   'TINK_SRC_PATH is set.')
+
+
+def template_from_testdata(
+    template_name: Text,
+    dir_name: Optional[Text] = None) -> tink_pb2.KeyTemplate:
+  """Reads a template from the testdata."""
+  if dir_name:
+    path = os.path.join(tink_root_path(), 'testdata/templates', dir_name,
+                        template_name)
   else:
-    raise ValueError(
-        'Could not find path to Tink root directory. Make sure that '
-        'TINK_SRC_PATH is set.'
-    )
+    path = os.path.join(tink_root_path(), 'testdata/templates', template_name)
+  with open(path, mode='rt') as f:
+    data = f.read()
+  return text_format.Parse(data, tink_pb2.KeyTemplate())
 
 
 def fake_key(value: bytes = b'fakevalue',

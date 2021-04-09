@@ -60,6 +60,7 @@ tink_cc_library(
   SRCS
     statusor.h
   DEPS
+    absl::status
     tink::util::status
   PUBLIC
 )
@@ -393,6 +394,78 @@ tink_cc_test(
   NAME secret_data_test
   SRCS secret_data_test.cc
   DEPS
+    absl::strings
     tink::util::secret_data
     gmock
+)
+
+tink_cc_library(
+  NAME secret_proto
+  SRCS
+    secret_proto.h
+  DEPS
+    absl::memory
+    tink::util::secret_data
+    protobuf::libprotobuf-lite
+)
+
+tink_cc_test(
+  NAME secret_proto_test
+  SRCS secret_proto_test.cc
+  DEPS
+    tink::util::secret_data
+    tink::proto::test_proto_cc_proto
+    absl::memory
+    gmock
+    protobuf::libprotobuf
+)
+
+tink_cc_library(
+  NAME fake_kms_client
+  SRCS
+    fake_kms_client.h
+    fake_kms_client.cc
+  DEPS
+    tink::util::errors
+    tink::util::status
+    tink::util::statusor
+    absl::strings
+    tink::aead::aead_key_templates
+    tink::core::aead
+    tink::core::binary_keyset_reader
+    tink::core::binary_keyset_writer
+    tink::core::cleartext_keyset_handle
+    tink::core::keyset_handle
+    tink::core::kms_client
+    tink::core::kms_clients
+)
+
+tink_cc_test(
+  NAME fake_kms_client_test
+  SRCS fake_kms_client_test.cc
+  DEPS
+    tink::util::errors
+    tink::util::fake_kms_client
+    tink::util::status
+    tink::util::statusor
+    tink::util::test_matchers
+    tink::util::test_util
+    tink::aead::aead_config
+    tink::aead::aead_key_templates
+    tink::proto::kms_aead_cc_proto
+    tink::proto::kms_envelope_cc_proto
+)
+
+tink_cc_test(
+  NAME statusor_test
+  SRCS
+    statusor_test.cc
+  DEPS
+    tink::util::status
+    tink::util::statusor
+    tink::util::test_matchers
+    gmock
+    absl::memory
+    absl::status
+    absl::statusor
 )

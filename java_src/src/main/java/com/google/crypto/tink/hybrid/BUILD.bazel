@@ -62,11 +62,15 @@ java_library(
         "//proto:aes_ctr_hmac_aead_java_proto",
         "//proto:aes_ctr_java_proto",
         "//proto:aes_gcm_java_proto",
+        "//proto:aes_siv_java_proto",
         "//proto:hmac_java_proto",
         "//proto:tink_java_proto",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink:deterministic_aead",
         "//src/main/java/com/google/crypto/tink:registry_cluster",
         "//src/main/java/com/google/crypto/tink/aead:aead_config",
+        "//src/main/java/com/google/crypto/tink/daead:deterministic_aead_config",
+        "//src/main/java/com/google/crypto/tink/hybrid/subtle:aead_or_daead",
         "//src/main/java/com/google/crypto/tink/subtle:ecies_aead_hkdf_dem_helper",
         "@com_google_protobuf//:protobuf_javalite",
     ],
@@ -82,6 +86,7 @@ java_library(
         ":hybrid_encrypt_wrapper",
         "//proto:config_java_proto",
         "//src/main/java/com/google/crypto/tink/aead:aead_config",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
     ],
 )
 
@@ -140,8 +145,6 @@ java_library(
     deps = [
         ":hybrid_decrypt_wrapper",
         "//src/main/java/com/google/crypto/tink:hybrid_decrypt",
-        "//src/main/java/com/google/crypto/tink:key_manager",
-        "//src/main/java/com/google/crypto/tink:primitive_set",
         "//src/main/java/com/google/crypto/tink:registry_cluster",
     ],
 )
@@ -152,8 +155,6 @@ java_library(
     deps = [
         ":hybrid_encrypt_wrapper",
         "//src/main/java/com/google/crypto/tink:hybrid_encrypt",
-        "//src/main/java/com/google/crypto/tink:key_manager",
-        "//src/main/java/com/google/crypto/tink:primitive_set",
         "//src/main/java/com/google/crypto/tink:registry_cluster",
     ],
 )
@@ -227,11 +228,15 @@ android_library(
         "//proto:aes_ctr_hmac_aead_java_proto_lite",
         "//proto:aes_ctr_java_proto_lite",
         "//proto:aes_gcm_java_proto_lite",
+        "//proto:aes_siv_java_proto_lite",
         "//proto:hmac_java_proto_lite",
         "//proto:tink_java_proto_lite",
         "//src/main/java/com/google/crypto/tink:aead",
+        "//src/main/java/com/google/crypto/tink:deterministic_aead",
         "//src/main/java/com/google/crypto/tink:registry_cluster-android",
         "//src/main/java/com/google/crypto/tink/aead:aead_config-android",
+        "//src/main/java/com/google/crypto/tink/daead:deterministic_aead_config-android",
+        "//src/main/java/com/google/crypto/tink/hybrid/subtle:aead_or_daead",
         "//src/main/java/com/google/crypto/tink/subtle:ecies_aead_hkdf_dem_helper",
         "@com_google_protobuf//:protobuf_javalite",
     ],
@@ -247,6 +252,7 @@ android_library(
         ":hybrid_encrypt_wrapper-android",
         "//proto:config_java_proto_lite",
         "//src/main/java/com/google/crypto/tink/aead:aead_config-android",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips-android",
     ],
 )
 
@@ -305,8 +311,6 @@ android_library(
     deps = [
         ":hybrid_decrypt_wrapper-android",
         "//src/main/java/com/google/crypto/tink:hybrid_decrypt",
-        "//src/main/java/com/google/crypto/tink:key_manager-android",
-        "//src/main/java/com/google/crypto/tink:primitive_set-android",
         "//src/main/java/com/google/crypto/tink:registry_cluster-android",
     ],
 )
@@ -317,8 +321,6 @@ android_library(
     deps = [
         ":hybrid_encrypt_wrapper-android",
         "//src/main/java/com/google/crypto/tink:hybrid_encrypt",
-        "//src/main/java/com/google/crypto/tink:key_manager-android",
-        "//src/main/java/com/google/crypto/tink:primitive_set-android",
         "//src/main/java/com/google/crypto/tink:registry_cluster-android",
     ],
 )

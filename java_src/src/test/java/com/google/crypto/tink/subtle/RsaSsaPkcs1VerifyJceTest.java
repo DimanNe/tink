@@ -17,18 +17,23 @@
 package com.google.crypto.tink.subtle;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertThrows;
 
+import com.google.crypto.tink.config.TinkFips;
 import com.google.crypto.tink.subtle.Enums.HashType;
 import com.google.crypto.tink.testing.TestUtil;
 import com.google.crypto.tink.testing.WycheproofTestUtil;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPairGenerator;
+import java.security.Security;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import org.conscrypt.Conscrypt;
+import org.junit.Assume;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -37,58 +42,79 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class RsaSsaPkcs1VerifyJceTest {
 
-  @Test
-  public void testConstructorExceptions() throws Exception {
-    int keySize = 2048;
-    KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-    keyGen.initialize(keySize);
-    RSAPublicKey pub = (RSAPublicKey) keyGen.generateKeyPair().getPublic();
-    try {
-      new RsaSsaPkcs1VerifyJce(pub, HashType.SHA1);
-      fail("Unsafe hash, should have thrown exception.");
-    } catch (GeneralSecurityException e) {
-      // Expected.
-      TestUtil.assertExceptionContains(e, "Unsupported hash: SHA1");
+  @Before
+  public void useConscrypt() throws Exception {
+    // If Tink is build in FIPS-only mode, then we register Conscrypt for the tests.
+    if (TinkFips.useOnlyFips()) {
+      try {
+        Conscrypt.checkAvailability();
+        Security.addProvider(Conscrypt.newProvider());
+      } catch (Throwable cause) {
+        throw new IllegalStateException(
+            "Cannot test RSA PKCS1.5 verify in FIPS-mode without Conscrypt Provider", cause);
+      }
     }
   }
 
   @Test
+  public void testConstructorExceptions() throws Exception {
+    Assume.assumeTrue(!TinkFips.useOnlyFips()); // Only 3072-bit modulus is supported in FIPS.
+
+    int keySize = 2048;
+    KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+    keyGen.initialize(keySize);
+    RSAPublicKey pub = (RSAPublicKey) keyGen.generateKeyPair().getPublic();
+    GeneralSecurityException e =
+        assertThrows(
+            GeneralSecurityException.class, () -> new RsaSsaPkcs1VerifyJce(pub, HashType.SHA1));
+    TestUtil.assertExceptionContains(e, "Unsupported hash: SHA1");
+  }
+
+  @Test
   public void testWycheproofVectors() throws Exception {
+    Assume.assumeTrue(!TinkFips.useOnlyFips()); // Only 3072-bit modulus is supported in FIPS.
+
     testWycheproofVectors("../wycheproof/testvectors/rsa_signature_2048_sha256_test.json");
-    testWycheproofVectors("../wycheproof/testvectors/rsa_signature_3072_sha512_test.json");
     testWycheproofVectors("../wycheproof/testvectors/rsa_signature_4096_sha512_test.json");
   }
 
+  @Test
+  public void testWycheproofVectors3072() throws Exception {
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+
+    testWycheproofVectors("../wycheproof/testvectors/rsa_signature_3072_sha512_test.json");
+  }
+
   private static void testWycheproofVectors(String fileName) throws Exception {
-    JSONObject jsonObj = WycheproofTestUtil.readJson(fileName);
+    JsonObject jsonObj = WycheproofTestUtil.readJson(fileName);
 
     int errors = 0;
-    JSONArray testGroups = jsonObj.getJSONArray("testGroups");
-    for (int i = 0; i < testGroups.length(); i++) {
-      JSONObject group = testGroups.getJSONObject(i);
+    JsonArray testGroups = jsonObj.getAsJsonArray("testGroups");
+    for (int i = 0; i < testGroups.size(); i++) {
+      JsonObject group = testGroups.get(i).getAsJsonObject();
 
       KeyFactory kf = KeyFactory.getInstance("RSA");
-      byte[] encodedPubKey = Hex.decode(group.getString("keyDer"));
+      byte[] encodedPubKey = Hex.decode(group.get("keyDer").getAsString());
       X509EncodedKeySpec x509keySpec = new X509EncodedKeySpec(encodedPubKey);
-      String sha = group.getString("sha");
+      String sha = group.get("sha").getAsString();
       HashType hash = WycheproofTestUtil.getHashType(sha);
 
-      JSONArray tests = group.getJSONArray("tests");
-      for (int j = 0; j < tests.length(); j++) {
-        JSONObject testcase = tests.getJSONObject(j);
+      JsonArray tests = group.getAsJsonArray("tests");
+      for (int j = 0; j < tests.size(); j++) {
+        JsonObject testcase = tests.get(j).getAsJsonObject();
         // Do not perform the Wycheproof test if the RSA public exponent is small.
         if (WycheproofTestUtil.checkFlags(testcase, "SmallPublicKey")) {
           continue;
         }
         String tcId =
-            String.format(
-                "testcase %d (%s)", testcase.getInt("tcId"), testcase.getString("comment"));
+            String.format("testcase %d (%s)",
+                testcase.get("tcId").getAsInt(), testcase.get("comment").getAsString());
         RSAPublicKey pubKey = (RSAPublicKey) kf.generatePublic(x509keySpec);
 
         RsaSsaPkcs1VerifyJce verifier = new RsaSsaPkcs1VerifyJce(pubKey, hash);
         byte[] msg = getMessage(testcase);
-        byte[] sig = Hex.decode(testcase.getString("sig"));
-        String result = testcase.getString("result");
+        byte[] sig = Hex.decode(testcase.get("sig").getAsString());
+        String result = testcase.get("result").getAsString();
         try {
           verifier.verify(sig, msg);
           if (result.equals("invalid")) {
@@ -106,12 +132,23 @@ public class RsaSsaPkcs1VerifyJceTest {
     assertEquals(0, errors);
   }
 
-  private static byte[] getMessage(JSONObject testcase) throws Exception {
+  private static byte[] getMessage(JsonObject testcase) throws Exception {
     // Previous version of Wycheproof test vectors uses "message" while the new one uses "msg".
     if (testcase.has("msg")) {
-      return Hex.decode(testcase.getString("msg"));
+      return Hex.decode(testcase.get("msg").getAsString());
     } else {
-      return Hex.decode(testcase.getString("message"));
+      return Hex.decode(testcase.get("message").getAsString());
     }
+  }
+
+  @Test
+  public void testFailIfFipsModuleNotAvailable() throws Exception {
+    Assume.assumeTrue(TinkFips.useOnlyFips() && !TinkFips.fipsModuleAvailable());
+
+    assertThrows(
+        GeneralSecurityException.class,
+        () ->
+            testWycheproofVectors(
+                "../wycheproof/testvectors/rsa_signature_3072_sha512_test.json"));
   }
 }

@@ -16,12 +16,12 @@
 
 package com.google.crypto.tink.signature;
 
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
-import com.google.crypto.tink.KeysetHandle;
+import com.google.crypto.tink.PrimitiveSet;
 import com.google.crypto.tink.PublicKeySign;
 import com.google.crypto.tink.PublicKeyVerify;
-import com.google.crypto.tink.Registry;
 import com.google.crypto.tink.proto.EcdsaPrivateKey;
 import com.google.crypto.tink.proto.EcdsaSignatureEncoding;
 import com.google.crypto.tink.proto.EllipticCurveType;
@@ -108,13 +108,12 @@ public class PublicKeyVerifyWrapperTest {
 
     int j = keys.length;
     for (int i = 0; i < j; i++) {
-      KeysetHandle keysetHandle =
-          TestUtil.createKeysetHandle(
+      PrimitiveSet<PublicKeyVerify> primitives =
+          TestUtil.createPrimitiveSet(
               TestUtil.createKeyset(
-                  keys[i], keys[(i + 1) % j], keys[(i + 2) % j], keys[(i + 3) % j]));
-      PublicKeyVerify verifier =
-          new PublicKeyVerifyWrapper()
-              .wrap(Registry.getPrimitives(keysetHandle, PublicKeyVerify.class));
+                  keys[i], keys[(i + 1) % j], keys[(i + 2) % j], keys[(i + 3) % j]),
+              PublicKeyVerify.class);
+      PublicKeyVerify verifier = new PublicKeyVerifyWrapper().wrap(primitives);
       // Signature from any keys in the keyset should be valid.
       for (int k = 0; k < j; k++) {
         PublicKeySign signer =
@@ -156,12 +155,7 @@ public class PublicKeyVerifyWrapperTest {
                           keys[0].getOutputPrefixType()))));
       byte[] plaintext = Random.randBytes(1211);
       byte[] sig = signer.sign(plaintext);
-      try {
-        verifier.verify(sig, plaintext);
-        fail("Invalid signature, should have thrown exception");
-      } catch (GeneralSecurityException expected) {
-        // Expected
-      }
+      assertThrows(GeneralSecurityException.class, () -> verifier.verify(sig, plaintext));
     }
   }
 }

@@ -17,10 +17,9 @@
 package com.google.crypto.tink.streamingaead;
 
 import static com.google.crypto.tink.testing.TestUtil.assertExceptionContains;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertThrows;
 
-import com.google.crypto.tink.KeysetHandle;
-import com.google.crypto.tink.Registry;
+import com.google.crypto.tink.PrimitiveSet;
 import com.google.crypto.tink.StreamingAead;
 import com.google.crypto.tink.daead.DeterministicAeadConfig;
 import com.google.crypto.tink.proto.KeyStatusType;
@@ -52,17 +51,17 @@ public class StreamingAeadWrapperTest {
     byte[] keyValue = Random.randBytes(KDF_KEY_SIZE);
     int derivedKeySize = AES_KEY_SIZE;
     int ciphertextSegmentSize = 128;
-    KeysetHandle keysetHandle =
-        TestUtil.createKeysetHandle(
+    PrimitiveSet<StreamingAead> primitives =
+        TestUtil.createPrimitiveSet(
             TestUtil.createKeyset(
                 TestUtil.createKey(
                     TestUtil.createAesCtrHmacStreamingKeyData(
                         keyValue, derivedKeySize, ciphertextSegmentSize),
                     42,
                     KeyStatusType.ENABLED,
-                    OutputPrefixType.RAW)));
-    StreamingAead streamingAead =
-        new StreamingAeadWrapper().wrap(Registry.getPrimitives(keysetHandle, StreamingAead.class));
+                    OutputPrefixType.RAW)),
+            StreamingAead.class);
+    StreamingAead streamingAead = new StreamingAeadWrapper().wrap(primitives);
     StreamingTestUtil.testEncryptionAndDecryption(streamingAead);
   }
 
@@ -71,17 +70,17 @@ public class StreamingAeadWrapperTest {
     byte[] keyValue = Random.randBytes(KDF_KEY_SIZE);
     int derivedKeySize = AES_KEY_SIZE;
     int ciphertextSegmentSize = 128;
-    KeysetHandle keysetHandle =
-        TestUtil.createKeysetHandle(
+    PrimitiveSet<StreamingAead> primitives =
+        TestUtil.createPrimitiveSet(
             TestUtil.createKeyset(
                 TestUtil.createKey(
                     TestUtil.createAesGcmHkdfStreamingKeyData(
                         keyValue, derivedKeySize, ciphertextSegmentSize),
                     42,
                     KeyStatusType.ENABLED,
-                    OutputPrefixType.RAW)));
-    StreamingAead streamingAead =
-        new StreamingAeadWrapper().wrap(Registry.getPrimitives(keysetHandle, StreamingAead.class));
+                    OutputPrefixType.RAW)),
+            StreamingAead.class);
+    StreamingAead streamingAead = new StreamingAeadWrapper().wrap(primitives);
     StreamingTestUtil.testEncryptionAndDecryption(streamingAead);
   }
 
@@ -113,29 +112,25 @@ public class StreamingAeadWrapperTest {
             KeyStatusType.ENABLED,
             OutputPrefixType.RAW);
 
-    KeysetHandle keysetHandle =
-        TestUtil.createKeysetHandle(TestUtil.createKeyset(primaryKey, otherKey, anotherKey));
-    StreamingAead streamingAead =
-        new StreamingAeadWrapper().wrap(Registry.getPrimitives(keysetHandle, StreamingAead.class));
+    PrimitiveSet<StreamingAead> primitives =
+        TestUtil.createPrimitiveSet(
+            TestUtil.createKeyset(primaryKey, otherKey, anotherKey), StreamingAead.class);
+    StreamingAead streamingAead = new StreamingAeadWrapper().wrap(primitives);
 
     StreamingAead primaryAead =
         new StreamingAeadWrapper()
             .wrap(
-                Registry.getPrimitives(
-                    TestUtil.createKeysetHandle(TestUtil.createKeyset(primaryKey)),
-                    StreamingAead.class));
+                TestUtil.createPrimitiveSet(
+                    TestUtil.createKeyset(primaryKey), StreamingAead.class));
     StreamingAead otherAead =
         new StreamingAeadWrapper()
             .wrap(
-                Registry.getPrimitives(
-                    TestUtil.createKeysetHandle(TestUtil.createKeyset(otherKey)),
-                    StreamingAead.class));
+                TestUtil.createPrimitiveSet(TestUtil.createKeyset(otherKey), StreamingAead.class));
     StreamingAead anotherAead =
         new StreamingAeadWrapper()
             .wrap(
-                Registry.getPrimitives(
-                    TestUtil.createKeysetHandle(TestUtil.createKeyset(anotherKey)),
-                    StreamingAead.class));
+                TestUtil.createPrimitiveSet(
+                    TestUtil.createKeyset(anotherKey), StreamingAead.class));
 
     StreamingTestUtil.testEncryptionAndDecryption(streamingAead, streamingAead);
     StreamingTestUtil.testEncryptionAndDecryption(streamingAead, primaryAead);
@@ -145,17 +140,15 @@ public class StreamingAeadWrapperTest {
     StreamingTestUtil.testEncryptionAndDecryption(primaryAead, primaryAead);
     StreamingTestUtil.testEncryptionAndDecryption(otherAead, otherAead);
     StreamingTestUtil.testEncryptionAndDecryption(anotherAead, anotherAead);
-    try {
-      StreamingTestUtil.testEncryptionAndDecryption(otherAead, primaryAead);
-      fail("No matching key, should have thrown an exception");
-    } catch (IOException expected) {
-      assertExceptionContains(expected, "No matching key");
-    }
-    try {
-      StreamingTestUtil.testEncryptionAndDecryption(anotherAead, primaryAead);
-      fail("No matching key, should have thrown an exception");
-    } catch (IOException expected) {
-      assertExceptionContains(expected, "No matching key");
-    }
+    IOException expected =
+        assertThrows(
+            IOException.class,
+            () -> StreamingTestUtil.testEncryptionAndDecryption(otherAead, primaryAead));
+    assertExceptionContains(expected, "No matching key");
+    IOException expected2 =
+        assertThrows(
+            IOException.class,
+            () -> StreamingTestUtil.testEncryptionAndDecryption(anotherAead, primaryAead));
+    assertExceptionContains(expected2, "No matching key");
   }
 }

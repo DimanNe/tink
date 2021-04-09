@@ -107,7 +107,29 @@ inline SecretData SecretDataFromStringView(absl::string_view secret) {
   return {secret.begin(), secret.end()};
 }
 
-inline void SafeZeroMemory(volatile char* ptr, std::size_t size) {
+template <typename T>
+class SecretValue {
+ public:
+  explicit SecretValue(T t = T())
+      : ptr_(MakeSecretUniquePtr<T>(std::move(t))) {}
+
+  SecretValue(const SecretValue& other) {
+    ptr_ = MakeSecretUniquePtr<T>(*other.ptr_);
+  }
+
+  SecretValue& operator=(const SecretValue& other) {
+    *ptr_ = *other.ptr_;
+    return *this;
+  }
+
+  T& value() { return *ptr_; }
+  const T& value() const { return *ptr_; }
+
+ private:
+  SecretUniquePtr<T> ptr_;
+};
+
+inline void SafeZeroMemory(char* ptr, std::size_t size) {
   internal::SafeZeroMemory(ptr, size);
 }
 

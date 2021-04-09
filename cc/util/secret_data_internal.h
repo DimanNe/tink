@@ -15,10 +15,9 @@
 #ifndef TINK_UTIL_SECRET_DATA_INTERNAL_H_
 #define TINK_UTIL_SECRET_DATA_INTERNAL_H_
 
+#include <cstddef>
 #include <memory>
-#include <type_traits>
 
-// placeholder for sanitization_functions include, please ignore
 #include "absl/base/attributes.h"
 
 namespace crypto {
@@ -26,9 +25,11 @@ namespace tink {
 namespace util {
 namespace internal {
 
-inline void SafeZeroMemory(volatile char* ptr, std::size_t size) {
+// placeholder for sanitization_functions, please ignore
+inline void SafeZeroMemory(char* ptr, std::size_t size) {
+  volatile char* vptr = ptr;
   while (size--) {
-    *ptr++ = 0;
+    *vptr++ = 0;
   }
 }
 
@@ -54,6 +55,29 @@ struct SanitizingAllocator {
   bool operator==(const SanitizingAllocator&) { return true; }
   bool operator!=(const SanitizingAllocator&) { return false; }
 };
+
+// Specialization for malloc-like aligned storage.
+template <>
+struct SanitizingAllocator<void> {
+  typedef void value_type;
+
+  SanitizingAllocator() = default;
+  template <class U>
+  explicit constexpr SanitizingAllocator(
+      const SanitizingAllocator<U>&) noexcept {}
+
+  ABSL_MUST_USE_RESULT void* allocate(std::size_t n) { return std::malloc(n); }
+
+  void deallocate(void* ptr, std::size_t n) noexcept {
+    SafeZeroMemory(reinterpret_cast<char*>(ptr), n);
+    std::free(ptr);
+  }
+
+  // Allocator requirements mandate definition of eq and neq operators
+  bool operator==(const SanitizingAllocator&) { return true; }
+  bool operator!=(const SanitizingAllocator&) { return false; }
+};
+// placeholder 2 for sanitization_functions, please ignore
 
 template <typename T>
 struct SanitizingDeleter {

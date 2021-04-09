@@ -18,8 +18,11 @@ package com.google.crypto.tink;
 
 import com.google.crypto.tink.proto.EncryptedKeyset;
 import com.google.crypto.tink.proto.KeyData;
+import com.google.crypto.tink.proto.KeyStatusType;
 import com.google.crypto.tink.proto.Keyset;
 import com.google.crypto.tink.proto.KeysetInfo;
+import com.google.crypto.tink.tinkkey.KeyAccess;
+import com.google.crypto.tink.tinkkey.KeyHandle;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.ExtensionRegistryLite;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -88,6 +91,14 @@ public final class KeysetHandle {
   public static final KeysetHandle generateNew(KeyTemplate keyTemplate)
       throws GeneralSecurityException {
     return KeysetManager.withEmptyKeyset().rotate(keyTemplate.getProto()).getKeysetHandle();
+  }
+
+  /** Creates a {@code KeysetHandle} that contains the single {@code KeyHandle} passed as input. */
+  public static final KeysetHandle createFromKey(KeyHandle keyHandle, KeyAccess access)
+      throws GeneralSecurityException {
+    KeysetManager km = KeysetManager.withEmptyKeyset().add(keyHandle, access);
+    km.setPrimary(km.getKeysetHandle().getKeysetInfo().getKeyInfo(0).getKeyId());
+    return km.getKeysetHandle();
   }
 
   /**
@@ -256,6 +267,7 @@ public final class KeysetHandle {
    * Extracts and returns the string representation of the {@link
    * com.google.crypto.tink.proto.KeysetInfo} of the managed keyset.
    */
+  @SuppressWarnings("LiteProtoToString") // main purpose of toString is for debugging
   @Override
   public String toString() {
     return getKeysetInfo().toString();
@@ -274,7 +286,7 @@ public final class KeysetHandle {
         throw new GeneralSecurityException(
             String.format(
                 "keyset contains key material of type %s for type url %s",
-                key.getKeyData().getKeyMaterialType(), key.getKeyData().getTypeUrl()));
+                key.getKeyData().getKeyMaterialType().name(), key.getKeyData().getTypeUrl()));
       }
     }
   }
@@ -305,9 +317,19 @@ public final class KeysetHandle {
   /** Helper function to allow us to have a a name {@code B} for the base primitive. */
   private <B, P> P getPrimitiveWithKnownInputPrimitive(
       Class<P> classObject, Class<B> inputPrimitiveClassObject) throws GeneralSecurityException {
-    PrimitiveSet<B> primitiveSet =
-        Registry.getPrimitives(this, inputPrimitiveClassObject);
-    return Registry.wrap(primitiveSet, classObject);
+    Util.validateKeyset(keyset);
+    PrimitiveSet<B> primitives = PrimitiveSet.newPrimitiveSet(inputPrimitiveClassObject);
+    for (Keyset.Key key : keyset.getKeyList()) {
+      if (key.getStatus() == KeyStatusType.ENABLED) {
+        B primitive = Registry.getPrimitive(key.getKeyData(), inputPrimitiveClassObject);
+        PrimitiveSet.Entry<B> entry = primitives.addPrimitive(primitive, key);
+        if (key.getKeyId() == keyset.getPrimaryKeyId()) {
+          primitives.setPrimary(entry);
+        }
+      }
+    }
+
+    return Registry.wrap(primitives, classObject);
   }
 
   /**
@@ -324,20 +346,17 @@ public final class KeysetHandle {
   }
 
   /**
-   * Returns a primitive from this keyset, using the given {@code customKeyManager} and the global
-   * registry to get resources creating the primitive. The given keyManager will take precedence
-   * when creating primitives over the globally registered keyManagers.
-   *
-   * @deprecated Register the keymanager and use the normal {@code getPrimitive}.
+   * Searches the keyset to find the primary key of this {@code KeysetHandle}, and returns the key
+   * wrapped in a {@code KeyHandle}.
    */
-  @Deprecated
-  public <P> P getPrimitive(KeyManager<P> customKeyManager, Class<P> targetClassObject)
-      throws GeneralSecurityException {
-    if (customKeyManager == null) {
-      throw new IllegalArgumentException("customKeyManager must be non-null.");
+  public KeyHandle primaryKey() throws GeneralSecurityException {
+    int primaryKeyId = keyset.getPrimaryKeyId();
+    for (Keyset.Key key : keyset.getKeyList()) {
+      if (key.getKeyId() == primaryKeyId) {
+        return KeyHandle.createFromKey(
+            key.getKeyData(), KeyTemplate.fromProto(key.getOutputPrefixType()));
+      }
     }
-    PrimitiveSet<P> primitiveSet =
-        Registry.getPrimitives(this, customKeyManager, targetClassObject);
-    return Registry.wrap(primitiveSet);
+    throw new GeneralSecurityException("No primary key found in keyset.");
   }
 }

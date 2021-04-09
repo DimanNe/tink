@@ -17,8 +17,10 @@
 package com.google.crypto.tink.subtle;
 
 import com.google.crypto.tink.PublicKeyVerify;
+import com.google.crypto.tink.config.TinkFips;
 import com.google.crypto.tink.subtle.EllipticCurves.EcdsaEncoding;
 import com.google.crypto.tink.subtle.Enums.HashType;
+import com.google.errorprone.annotations.Immutable;
 import java.security.GeneralSecurityException;
 import java.security.Signature;
 import java.security.interfaces.ECPublicKey;
@@ -29,13 +31,24 @@ import java.security.spec.EllipticCurve;
  *
  * @since 1.0.0
  */
+@Immutable
 public final class EcdsaVerifyJce implements PublicKeyVerify {
+  public static final TinkFips.AlgorithmFipsCompatibility FIPS =
+      TinkFips.AlgorithmFipsCompatibility.ALGORITHM_REQUIRES_BORINGCRYPTO;
+
+  @SuppressWarnings("Immutable")
   private final ECPublicKey publicKey;
+
   private final String signatureAlgorithm;
   private final EcdsaEncoding encoding;
 
   public EcdsaVerifyJce(final ECPublicKey pubKey, HashType hash, EcdsaEncoding encoding)
       throws GeneralSecurityException {
+    if (!FIPS.isCompatible()) {
+      throw new GeneralSecurityException(
+          "Can not use ECDSA in FIPS-mode, as BoringCrypto is not available.");
+    }
+
     EllipticCurves.checkPublicKey(pubKey);
     this.signatureAlgorithm = SubtleUtil.toEcdsaAlgo(hash);
     this.publicKey = pubKey;

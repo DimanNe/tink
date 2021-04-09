@@ -8,8 +8,10 @@ go_library(
         "aes_cmac.go",
         "hkdf.go",
         "hmac.go",
+        "subtle.go",
     ],
     importpath = "github.com/google/tink/go/prf/subtle",
+    visibility = ["//visibility:public"],
     deps = [
         "//subtle:go_default_library",
         "@org_golang_x_crypto//hkdf:go_default_library",
@@ -23,7 +25,11 @@ go_test(
         "aes_cmac_test.go",
         "hkdf_test.go",
         "hmac_test.go",
+        "subtle_test.go",
     ],
     data = ["@wycheproof//testvectors:all"],
-    embed = [":go_default_library"],
+    deps = [
+        ":go_default_library",
+        "//testutil:go_default_library",
+    ],
 )

@@ -35,6 +35,7 @@ final class JwtNames {
 
   static final String HEADER_KEY_ID = "kid";
   static final String HEADER_TYPE = "typ";
+  static final String HEADER_TYPE_VALUE = "JWT";
   static final String HEADER_CONTENT_TYPE = "cty";
 
   static String validate(String name) {
@@ -48,7 +49,7 @@ final class JwtNames {
     return name;
   }
 
-  private static boolean isRegisteredName(String name) {
+  static boolean isRegisteredName(String name) {
     return name.equals(CLAIM_ISSUER)
         || name.equals(CLAIM_SUBJECT)
         || name.equals(CLAIM_AUDIENCE)

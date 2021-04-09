@@ -16,64 +16,109 @@ package daead_test
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/tink/go/core/registry"
 	"github.com/google/tink/go/daead"
+	"github.com/google/tink/go/keyset"
 	"github.com/google/tink/go/testutil"
-	"github.com/google/tink/go/tink"
 
 	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
 )
 
-func TestAESSIVKeyTemplate(t *testing.T) {
-	template := daead.AESSIVKeyTemplate()
-	if template.TypeUrl != testutil.AESSIVTypeURL {
-		t.Errorf("incorrect type url: %v, expected %v", template.TypeUrl, testutil.AESSIVTypeURL)
+func TestKeyTemplates(t *testing.T) {
+	testutil.SkipTestIfTestSrcDirIsNotSet(t)
+	var testCases = []struct {
+		name     string
+		template *tinkpb.KeyTemplate
+	}{
+		{name: "AES256_SIV",
+			template: daead.AESSIVKeyTemplate()},
 	}
-	if err := testEncryptDecrypt(template); err != nil {
-		t.Errorf("%v", err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			want, err := testutil.KeyTemplateProto("daead", tc.name)
+			if err != nil {
+				t.Fatalf("testutil.KeyTemplateProto('daead', tc.name) failed: %s", err)
+			}
+			if !proto.Equal(want, tc.template) {
+				t.Errorf("template %s is not equal to '%s'", tc.name, tc.template)
+			}
+			if err := testEncryptDecrypt(tc.template); err != nil {
+				t.Errorf("%v", err)
+			}
+		})
 	}
 }
 
 func testEncryptDecrypt(template *tinkpb.KeyTemplate) error {
-	key, err := registry.NewKey(template)
+	handle, err := keyset.NewHandle(template)
 	if err != nil {
-		return fmt.Errorf("failed to get key from template, error: %v", err)
+		return fmt.Errorf("keyset.NewHandle(template) failed: %v", err)
 	}
 
-	sk, err := proto.Marshal(key)
+	primitive, err := daead.New(handle)
 	if err != nil {
-		return fmt.Errorf("failed to serialize key, error: %v", err)
+		return fmt.Errorf("daead.New(handle) failed: %v", err)
 	}
 
-	p, err := registry.Primitive(template.TypeUrl, sk)
-	if err != nil {
-		return fmt.Errorf("failed to get primitive from serialized key, error: %v", err)
+	var testInputs = []struct {
+		plaintext []byte
+		aad1      []byte
+		aad2      []byte
+	}{
+		{
+			plaintext: []byte("some data to encrypt"),
+			aad1:      []byte("extra data to authenticate"),
+			aad2:      []byte("extra data to authenticate"),
+		}, {
+			plaintext: []byte("some data to encrypt"),
+			aad1:      []byte(""),
+			aad2:      []byte(""),
+		}, {
+			plaintext: []byte("some data to encrypt"),
+			aad1:      nil,
+			aad2:      nil,
+		}, {
+			plaintext: []byte(""),
+			aad1:      nil,
+			aad2:      nil,
+		}, {
+			plaintext: nil,
+			aad1:      []byte("extra data to authenticate"),
+			aad2:      []byte("extra data to authenticate"),
+		}, {
+			plaintext: nil,
+			aad1:      []byte(""),
+			aad2:      []byte(""),
+		}, {
+			plaintext: nil,
+			aad1:      nil,
+			aad2:      nil,
+		}, {
+			plaintext: []byte("some data to encrypt"),
+			aad1:      []byte(""),
+			aad2:      nil,
+		}, {
+			plaintext: []byte("some data to encrypt"),
+			aad1:      nil,
+			aad2:      []byte(""),
+		},
 	}
+	for _, ti := range testInputs {
+		ciphertext, err := primitive.EncryptDeterministically(ti.plaintext, ti.aad1)
+		if err != nil {
+			return fmt.Errorf("encryption failed, error: %v", err)
+		}
+		decrypted, err := primitive.DecryptDeterministically(ciphertext, ti.aad2)
+		if err != nil {
+			return fmt.Errorf("decryption failed, error: %v", err)
+		}
 
-	primitive, ok := p.(tink.DeterministicAEAD)
-	if !ok {
-		return errors.New("failed to convert DeterministicAEAD primitive")
+		if !bytes.Equal(ti.plaintext, decrypted) {
+			return fmt.Errorf("decrypted data doesn't match plaintext, got: %q, want: %q", decrypted, ti.plaintext)
+		}
 	}
-
-	plaintext := []byte("some data to encrypt")
-	aad := []byte("extra data to authenticate")
-	ciphertext, err := primitive.EncryptDeterministically(plaintext, aad)
-	if err != nil {
-		return fmt.Errorf("encryption failed, error: %v", err)
-	}
-	decrypted, err := primitive.DecryptDeterministically(ciphertext, aad)
-	if err != nil {
-		return fmt.Errorf("decryption failed, error: %v", err)
-	}
-
-	if !bytes.Equal(plaintext, decrypted) {
-		return fmt.Errorf("decrypted data doesn't match plaintext, got: %q, want: %q", decrypted, plaintext)
-	}
-
 	return nil
 }

@@ -16,70 +16,107 @@ package hybrid
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/google/tink/go/aead"
-	commonpb "github.com/google/tink/go/proto/common_go_proto"
-	eciespb "github.com/google/tink/go/proto/ecies_aead_hkdf_go_proto"
+	"github.com/google/tink/go/keyset"
+	"github.com/google/tink/go/testutil"
 	tinkpb "github.com/google/tink/go/proto/tink_go_proto"
 )
 
-func TestECIESHKDFAES128GCMKeyTemplate(t *testing.T) {
-	kformat := new(eciespb.EciesAeadHkdfKeyFormat)
-	kt := ECIESHKDFAES128GCMKeyTemplate()
-	if kt.TypeUrl != eciesAEADHKDFPrivateKeyTypeURL {
-		t.Error("type url mismatch")
+func TestKeyTemplates(t *testing.T) {
+	testutil.SkipTestIfTestSrcDirIsNotSet(t)
+	var testCases = []struct {
+		name     string
+		template *tinkpb.KeyTemplate
+	}{
+		{name: "ECIES_P256_HKDF_HMAC_SHA256_AES128_GCM",
+			template: ECIESHKDFAES128GCMKeyTemplate()},
+		{name: "ECIES_P256_HKDF_HMAC_SHA256_AES128_CTR_HMAC_SHA256",
+			template: ECIESHKDFAES128CTRHMACSHA256KeyTemplate()},
 	}
-	if kt.OutputPrefixType != tinkpb.OutputPrefixType_TINK {
-		t.Error("tink output prefix mismatch")
-	}
-	if err := proto.Unmarshal(kt.Value, kformat); err != nil {
-		t.Error("output format")
-	}
-	if kformat.Params.KemParams.CurveType != commonpb.EllipticCurveType_NIST_P256 {
-		t.Error("EC Curve mismatch")
-	}
-	if kformat.Params.KemParams.HkdfHashType != commonpb.HashType_SHA256 {
-		t.Error("Hash type mismatch")
-	}
-	if !bytes.Equal(kformat.Params.KemParams.HkdfSalt, []byte{}) {
-		t.Error("salt mismatch")
-	}
-	if strings.Compare(kformat.Params.DemParams.AeadDem.String(), aead.AES128GCMKeyTemplate().String()) != 0 {
-		t.Error("AEAD DEM mismatch")
-	}
-	if kformat.Params.EcPointFormat != commonpb.EcPointFormat_UNCOMPRESSED {
-		t.Error("point format mismatch")
-	}
-}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			want, err := testutil.KeyTemplateProto("hybrid", tc.name)
+			if err != nil {
+				t.Fatalf("testutil.KeyTemplateProto('hybrid', tc.name) failed: %s", err)
+			}
+			if !proto.Equal(want, tc.template) {
+				t.Errorf("template %s is not equal to '%s'", tc.name, tc.template)
+			}
 
-func TestECIESHKDFAES128CTRHMACSHA256KeyTemplate(t *testing.T) {
-	kformat := new(eciespb.EciesAeadHkdfKeyFormat)
-	kt := ECIESHKDFAES128CTRHMACSHA256KeyTemplate()
-	if kt.TypeUrl != eciesAEADHKDFPrivateKeyTypeURL {
-		t.Error("type url mismatch")
-	}
-	if kt.OutputPrefixType != tinkpb.OutputPrefixType_TINK {
-		t.Error("tink output prefix mismatch")
-	}
-	if err := proto.Unmarshal(kt.Value, kformat); err != nil {
-		t.Error("output format")
-	}
-	if kformat.Params.KemParams.CurveType != commonpb.EllipticCurveType_NIST_P256 {
-		t.Error("EC Curve mismatch")
-	}
-	if kformat.Params.KemParams.HkdfHashType != commonpb.HashType_SHA256 {
-		t.Error("Hash type mismatch")
-	}
-	if !bytes.Equal(kformat.Params.KemParams.HkdfSalt, []byte{}) {
-		t.Error("salt mismatch")
-	}
-	if strings.Compare(kformat.Params.DemParams.AeadDem.String(), aead.AES128CTRHMACSHA256KeyTemplate().String()) != 0 {
-		t.Error("AEAD DEM mismatch")
-	}
-	if kformat.Params.EcPointFormat != commonpb.EcPointFormat_UNCOMPRESSED {
-		t.Error("point format mismatch")
+			privateHandle, err := keyset.NewHandle(tc.template)
+			if err != nil {
+				t.Fatalf("keyset.NewHandle(tc.template) failed: %s", err)
+			}
+			publicHandle, err := privateHandle.Public()
+			if err != nil {
+				t.Fatalf("privateHandle.Public() failed: %s", err)
+			}
+			enc, err := NewHybridEncrypt(publicHandle)
+			if err != nil {
+				t.Fatalf("NewHybridEncrypt(publicHandle) failed: %s", err)
+			}
+			dec, err := NewHybridDecrypt(privateHandle)
+			if err != nil {
+				t.Fatalf("NewHybridDecrypt(privateHandle) failed: %s", err)
+			}
+			var testInputs = []struct {
+				plaintext []byte
+				context1  []byte
+				context2  []byte
+			}{
+				{
+					plaintext: []byte("this data needs to be encrypted"),
+					context1:  []byte("encryption context"),
+					context2:  []byte("encryption context"),
+				}, {
+					plaintext: []byte("this data needs to be encrypted"),
+					context1:  []byte(""),
+					context2:  []byte(""),
+				}, {
+					plaintext: []byte("this data needs to be encrypted"),
+					context1:  nil,
+					context2:  nil,
+				}, {
+					plaintext: []byte(""),
+					context1:  nil,
+					context2:  nil,
+				}, {
+					plaintext: nil,
+					context1:  []byte("encryption context"),
+					context2:  []byte("encryption context"),
+				}, {
+					plaintext: nil,
+					context1:  []byte(""),
+					context2:  []byte(""),
+				}, {
+					plaintext: nil,
+					context1:  nil,
+					context2:  nil,
+				}, {
+					plaintext: []byte("this data needs to be encrypted"),
+					context1:  []byte(""),
+					context2:  nil,
+				}, {
+					plaintext: []byte("this data needs to be encrypted"),
+					context1:  nil,
+					context2:  []byte(""),
+				},
+			}
+			for _, ti := range testInputs {
+				ciphertext, err := enc.Encrypt(ti.plaintext, ti.context1)
+				if err != nil {
+					t.Fatalf("enc.Encrypt(ti.plaintext, ti.context1) failed: %s", err)
+				}
+				decrypted, err := dec.Decrypt(ciphertext, ti.context2)
+				if err != nil {
+					t.Fatalf("dec.Decrypt(ciphertext, ti.context2) failed: %s", err)
+				}
+				if !bytes.Equal(ti.plaintext, decrypted) {
+					t.Errorf("decrypted data doesn't match plaintext, got: %q, want: %q", decrypted, ti.plaintext)
+				}
+			}
+		})
 	}
 }

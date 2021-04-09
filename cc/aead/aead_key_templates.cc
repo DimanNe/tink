@@ -16,11 +16,13 @@
 
 #include "tink/aead/aead_key_templates.h"
 
+#include "absl/strings/string_view.h"
 #include "proto/aes_ctr_hmac_aead.pb.h"
 #include "proto/aes_eax.pb.h"
 #include "proto/aes_gcm.pb.h"
 #include "proto/aes_gcm_siv.pb.h"
 #include "proto/common.pb.h"
+#include "proto/kms_envelope.pb.h"
 #include "proto/tink.pb.h"
 #include "proto/xchacha20_poly1305.pb.h"
 
@@ -30,6 +32,7 @@ using google::crypto::tink::AesGcmKeyFormat;
 using google::crypto::tink::AesGcmSivKeyFormat;
 using google::crypto::tink::HashType;
 using google::crypto::tink::KeyTemplate;
+using google::crypto::tink::KmsEnvelopeAeadKeyFormat;
 using google::crypto::tink::OutputPrefixType;
 
 namespace crypto {
@@ -49,11 +52,12 @@ KeyTemplate* NewAesEaxKeyTemplate(int key_size_in_bytes, int iv_size_in_bytes) {
   return key_template;
 }
 
-KeyTemplate* NewAesGcmKeyTemplate(int key_size_in_bytes) {
+KeyTemplate* NewAesGcmKeyTemplate(int key_size_in_bytes,
+                                  OutputPrefixType output_prefix_type) {
   KeyTemplate* key_template = new KeyTemplate;
   key_template->set_type_url(
       "type.googleapis.com/google.crypto.tink.AesGcmKey");
-  key_template->set_output_prefix_type(OutputPrefixType::TINK);
+  key_template->set_output_prefix_type(output_prefix_type);
   AesGcmKeyFormat key_format;
   key_format.set_key_size(key_size_in_bytes);
   key_format.SerializeToString(key_template->mutable_value());
@@ -121,14 +125,21 @@ const KeyTemplate& AeadKeyTemplates::Aes256Eax() {
 // static
 const KeyTemplate& AeadKeyTemplates::Aes128Gcm() {
   static const KeyTemplate* key_template =
-      NewAesGcmKeyTemplate(/* key_size_in_bytes= */ 16);
+      NewAesGcmKeyTemplate(/* key_size_in_bytes= */ 16, OutputPrefixType::TINK);
   return *key_template;
 }
 
 // static
 const KeyTemplate& AeadKeyTemplates::Aes256Gcm() {
   static const KeyTemplate* key_template =
-      NewAesGcmKeyTemplate(/* key_size_in_bytes= */ 32);
+      NewAesGcmKeyTemplate(/* key_size_in_bytes= */ 32, OutputPrefixType::TINK);
+  return *key_template;
+}
+
+// static
+const KeyTemplate& AeadKeyTemplates::Aes256GcmNoPrefix() {
+  static const KeyTemplate* key_template =
+      NewAesGcmKeyTemplate(/* key_size_in_bytes= */ 32, OutputPrefixType::RAW);
   return *key_template;
 }
 
@@ -170,6 +181,20 @@ const KeyTemplate& AeadKeyTemplates::Aes256CtrHmacSha256() {
 const KeyTemplate& AeadKeyTemplates::XChaCha20Poly1305() {
   static const KeyTemplate* key_template = NewXChaCha20Poly1305KeyTemplate();
   return *key_template;
+}
+
+// static
+KeyTemplate AeadKeyTemplates::KmsEnvelopeAead(absl::string_view kek_uri,
+                                              const KeyTemplate& dek_template) {
+  KeyTemplate key_template;
+  key_template.set_type_url(
+      "type.googleapis.com/google.crypto.tink.KmsEnvelopeAeadKey");
+  key_template.set_output_prefix_type(OutputPrefixType::RAW);
+  KmsEnvelopeAeadKeyFormat key_format;
+  key_format.set_kek_uri(std::string(kek_uri));
+  key_format.mutable_dek_template()->MergeFrom(dek_template);
+  key_format.SerializeToString(key_template.mutable_value());
+  return key_template;
 }
 
 }  // namespace tink

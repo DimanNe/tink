@@ -18,14 +18,17 @@ package com.google.crypto.tink.subtle;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
+import com.google.crypto.tink.config.TinkFips;
 import com.google.crypto.tink.testing.TestUtil;
 import com.google.crypto.tink.testing.WycheproofTestUtil;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import java.security.GeneralSecurityException;
 import java.util.TreeSet;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -39,6 +42,8 @@ public final class Ed25519SignTest {
 
   @Test
   public void testSigningOneKeyWithMultipleMessages() throws Exception {
+    Assume.assumeFalse(TinkFips.useOnlyFips());
+
     Ed25519Sign.KeyPair keyPair = Ed25519Sign.KeyPair.newKeyPair();
     Ed25519Sign signer = new Ed25519Sign(keyPair.getPrivateKey());
     Ed25519Verify verifier = new Ed25519Verify(keyPair.getPublicKey());
@@ -61,6 +66,8 @@ public final class Ed25519SignTest {
 
   @Test
   public void testSigningOneKeyWithTheSameMessage() throws Exception {
+    Assume.assumeFalse(TinkFips.useOnlyFips());
+
     Ed25519Sign.KeyPair keyPair = Ed25519Sign.KeyPair.newKeyPair();
     Ed25519Sign signer = new Ed25519Sign(keyPair.getPrivateKey());
     Ed25519Verify verifier = new Ed25519Verify(keyPair.getPublicKey());
@@ -87,20 +94,24 @@ public final class Ed25519SignTest {
 
   @Test
   public void testSignWithPrivateKeyLengthDifferentFrom32Byte() throws Exception {
-    try {
-      Ed25519Sign unused = new Ed25519Sign(new byte[31]);
-      fail("Private key length should be 32-byte");
-    } catch (IllegalArgumentException expected) {
-    }
-    try {
-      Ed25519Sign unused = new Ed25519Sign(new byte[33]);
-      fail("Private key length should be 32-byte");
-    } catch (IllegalArgumentException expected) {
-    }
+    Assume.assumeFalse(TinkFips.useOnlyFips());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          Ed25519Sign unused = new Ed25519Sign(new byte[31]);
+        });
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> {
+          Ed25519Sign unused = new Ed25519Sign(new byte[33]);
+        });
   }
 
   @Test
   public void testSigningWithMultipleRandomKeysAndMessages() throws Exception {
+    Assume.assumeFalse(TinkFips.useOnlyFips());
+
     for (int i = 0; i < 100; i++) {
       Ed25519Sign.KeyPair keyPair = Ed25519Sign.KeyPair.newKeyPair();
       Ed25519Sign signer = new Ed25519Sign(keyPair.getPrivateKey());
@@ -121,33 +132,36 @@ public final class Ed25519SignTest {
     }
   }
 
-  private byte[] getMessage(JSONObject testcase) throws Exception {
+  private byte[] getMessage(JsonObject testcase) throws Exception {
     if (testcase.has("msg")) {
-      return Hex.decode(testcase.getString("msg"));
+      return Hex.decode(testcase.get("msg").getAsString());
     } else {
-      return Hex.decode(testcase.getString("message"));
+      return Hex.decode(testcase.get("message").getAsString());
     }
   }
 
   @Test
   public void testSigningWithWycheproofVectors() throws Exception {
-    JSONObject json =
+    Assume.assumeFalse(TinkFips.useOnlyFips());
+
+    JsonObject json =
         WycheproofTestUtil.readJson("../wycheproof/testvectors/eddsa_test.json");
     int errors = 0;
-    JSONArray testGroups = json.getJSONArray("testGroups");
-    for (int i = 0; i < testGroups.length(); i++) {
-      JSONObject group = testGroups.getJSONObject(i);
-      JSONObject key = group.getJSONObject("key");
-      byte[] privateKey = Hex.decode(key.getString("sk"));
-      JSONArray tests = group.getJSONArray("tests");
-      for (int j = 0; j < tests.length(); j++) {
-        JSONObject testcase = tests.getJSONObject(j);
+    JsonArray testGroups = json.get("testGroups").getAsJsonArray();
+    for (int i = 0; i < testGroups.size(); i++) {
+      JsonObject group = testGroups.get(i).getAsJsonObject();
+      JsonObject key = group.get("key").getAsJsonObject();
+      byte[] privateKey = Hex.decode(key.get("sk").getAsString());
+      JsonArray tests = group.get("tests").getAsJsonArray();
+      for (int j = 0; j < tests.size(); j++) {
+        JsonObject testcase = tests.get(j).getAsJsonObject();
         String tcId =
             String.format(
-                "testcase %d (%s)", testcase.getInt("tcId"), testcase.getString("comment"));
+                "testcase %d (%s)",
+                testcase.get("tcId").getAsInt(), testcase.get("comment").getAsString());
         byte[] msg = getMessage(testcase);
-        byte[] sig = Hex.decode(testcase.getString("sig"));
-        String result = testcase.getString("result");
+        byte[] sig = Hex.decode(testcase.get("sig").getAsString());
+        String result = testcase.get("result").getAsString();
         if (result.equals("invalid")) {
           continue;
         }
@@ -157,5 +171,22 @@ public final class Ed25519SignTest {
       }
     }
     assertEquals(0, errors);
+  }
+
+  @Test
+  public void testKeyPairFromSeedTooShort() throws Exception {
+    Assume.assumeFalse(TinkFips.useOnlyFips());
+
+    byte[] keyMaterial = Random.randBytes(10);
+    assertThrows(
+        IllegalArgumentException.class, () -> Ed25519Sign.KeyPair.newKeyPairFromSeed(keyMaterial));
+  }
+
+  @Test
+  public void testFailIfFipsModuleNotAvailable() throws Exception {
+    Assume.assumeTrue(TinkFips.useOnlyFips());
+
+    byte[] key = Random.randBytes(32);
+    assertThrows(GeneralSecurityException.class, () -> new Ed25519Sign(key));
   }
 }

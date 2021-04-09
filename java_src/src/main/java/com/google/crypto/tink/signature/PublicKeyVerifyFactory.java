@@ -16,9 +16,7 @@
 
 package com.google.crypto.tink.signature;
 
-import com.google.crypto.tink.KeyManager;
 import com.google.crypto.tink.KeysetHandle;
-import com.google.crypto.tink.PrimitiveSet;
 import com.google.crypto.tink.PublicKeyVerify;
 import com.google.crypto.tink.Registry;
 import java.security.GeneralSecurityException;
@@ -49,23 +47,7 @@ public final class PublicKeyVerifyFactory {
   @Deprecated
   public static PublicKeyVerify getPrimitive(KeysetHandle keysetHandle)
       throws GeneralSecurityException {
-    return getPrimitive(keysetHandle, /* keyManager= */ null);
-  }
-
-  /**
-   * @return a PublicKeyVerify primitive from a {@code keysetHandle} and a custom {@code
-   *     keyManager}.
-   * @throws GeneralSecurityException
-   * @deprecated Use {@code keysetHandle.GetPrimitive(keyManager, PublicKeyVerify.class)} after
-   *     registering the {@code PublicKeyVerifyWrapper} instead.
-   */
-  @Deprecated
-  public static PublicKeyVerify getPrimitive(
-      KeysetHandle keysetHandle, final KeyManager<PublicKeyVerify> keyManager)
-      throws GeneralSecurityException {
     Registry.registerPrimitiveWrapper(new PublicKeyVerifyWrapper());
-    final PrimitiveSet<PublicKeyVerify> primitives =
-        Registry.getPrimitives(keysetHandle, keyManager, PublicKeyVerify.class);
-    return Registry.wrap(primitives);
+    return keysetHandle.getPrimitive(PublicKeyVerify.class);
   }
 }

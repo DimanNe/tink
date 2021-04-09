@@ -21,6 +21,8 @@ set -e
 # Display commands to stderr.
 set -x
 
+./kokoro/copy_credentials.sh
+
 readonly PLATFORM="$(uname | tr '[:upper:]' '[:lower:]')"
 
 # TODO(b/140615798): Remove once fixed.
@@ -112,7 +114,7 @@ install_tink_via_pip() {
 }
 
 install_temp_protoc() {
-  local protoc_version='3.11.4'
+  local protoc_version='3.14.0'
   local protoc_platform
   case "${PLATFORM}" in
     'linux')
@@ -140,10 +142,6 @@ install_temp_protoc() {
 main() {
   # Initialization for Kokoro environments.
   if [[ -n "${KOKORO_ROOT}" ]]; then
-    # TODO(b/73748835): Workaround on Kokoro.
-    rm -f ~/.bazelrc
-
-    # TODO(b/131821833) Use the latest version of Bazel.
     use_bazel.sh $(cat .bazelversion)
 
     # Install protoc into a temporary directory.
@@ -209,7 +207,7 @@ main() {
   run_all_linux_tests
 
   if [[ "${PLATFORM}" == 'darwin' ]]; then
-    # TODO(przydatek): re-enable after ObjC WORKSPACE is added.
+    # TODO(b/155060426): re-enable after ObjC WORKSPACE is added.
     # run_macos_tests
     echo "*** ObjC tests not enabled yet."
   fi

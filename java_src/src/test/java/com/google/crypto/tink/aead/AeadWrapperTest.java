@@ -19,12 +19,11 @@ package com.google.crypto.tink.aead;
 import static com.google.crypto.tink.testing.TestUtil.assertExceptionContains;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertThrows;
 
 import com.google.crypto.tink.Aead;
 import com.google.crypto.tink.CryptoFormat;
-import com.google.crypto.tink.KeysetHandle;
-import com.google.crypto.tink.Registry;
+import com.google.crypto.tink.PrimitiveSet;
 import com.google.crypto.tink.proto.KeyStatusType;
 import com.google.crypto.tink.proto.Keyset.Key;
 import com.google.crypto.tink.proto.OutputPrefixType;
@@ -54,16 +53,18 @@ public class AeadWrapperTest {
     byte[] hmacKeyValue = Random.randBytes(HMAC_KEY_SIZE);
     int ivSize = 12;
     int tagSize = 16;
-    KeysetHandle keysetHandle =
-        TestUtil.createKeysetHandle(
+    PrimitiveSet<Aead> primitives =
+        TestUtil.createPrimitiveSet(
             TestUtil.createKeyset(
                 TestUtil.createKey(
                     TestUtil.createAesCtrHmacAeadKeyData(
                         aesCtrKeyValue, ivSize, hmacKeyValue, tagSize),
                     42,
                     KeyStatusType.ENABLED,
-                    OutputPrefixType.TINK)));
-    Aead aead = new AeadWrapper().wrap(Registry.getPrimitives(keysetHandle, Aead.class));
+                    OutputPrefixType.TINK)),
+            Aead.class);
+    Aead aead = new AeadWrapper().wrap(primitives);
+
     byte[] plaintext = Random.randBytes(20);
     byte[] associatedData = Random.randBytes(20);
     byte[] ciphertext = aead.encrypt(plaintext, associatedData);
@@ -104,9 +105,11 @@ public class AeadWrapperTest {
             KeyStatusType.ENABLED,
             OutputPrefixType.TINK);
 
-    KeysetHandle keysetHandle =
-        TestUtil.createKeysetHandle(TestUtil.createKeyset(primary, raw, legacy, tink));
-    Aead aead = new AeadWrapper().wrap(Registry.getPrimitives(keysetHandle, Aead.class));
+    Aead aead =
+        new AeadWrapper()
+            .wrap(
+                TestUtil.createPrimitiveSet(
+                    TestUtil.createKeyset(primary, raw, legacy, tink), Aead.class));
     byte[] plaintext = Random.randBytes(20);
     byte[] associatedData = Random.randBytes(20);
     byte[] ciphertext = aead.encrypt(plaintext, associatedData);
@@ -118,9 +121,10 @@ public class AeadWrapperTest {
         CryptoFormat.NON_RAW_PREFIX_SIZE + plaintext.length + ivSize + tagSize, ciphertext.length);
 
     // encrypt with a non-primary RAW key and decrypt with the keyset
-    KeysetHandle keysetHandle2 =
-        TestUtil.createKeysetHandle(TestUtil.createKeyset(raw, legacy, tink));
-    Aead aead2 = new AeadWrapper().wrap(Registry.getPrimitives(keysetHandle2, Aead.class));
+    Aead aead2 =
+        new AeadWrapper()
+            .wrap(
+                TestUtil.createPrimitiveSet(TestUtil.createKeyset(raw, legacy, tink), Aead.class));
     ciphertext = aead2.encrypt(plaintext, associatedData);
     assertArrayEquals(plaintext, aead.decrypt(ciphertext, associatedData));
 
@@ -133,15 +137,14 @@ public class AeadWrapperTest {
             44,
             KeyStatusType.ENABLED,
             OutputPrefixType.TINK);
-    keysetHandle2 = TestUtil.createKeysetHandle(TestUtil.createKeyset(random));
-    aead2 = new AeadWrapper().wrap(Registry.getPrimitives(keysetHandle2, Aead.class));
-    ciphertext = aead2.encrypt(plaintext, associatedData);
-    try {
-      aead.decrypt(ciphertext, associatedData);
-      fail("Expected GeneralSecurityException");
-    } catch (GeneralSecurityException e) {
-      assertExceptionContains(e, "decryption failed");
-    }
+    aead2 =
+        new AeadWrapper()
+            .wrap(TestUtil.createPrimitiveSet(TestUtil.createKeyset(random), Aead.class));
+    final byte[] ciphertext2 = aead2.encrypt(plaintext, associatedData);
+    GeneralSecurityException e =
+        assertThrows(
+            GeneralSecurityException.class, () -> aead.decrypt(ciphertext2, associatedData));
+    assertExceptionContains(e, "decryption failed");
   }
 
   @Test
@@ -169,9 +172,11 @@ public class AeadWrapperTest {
             44,
             KeyStatusType.ENABLED,
             OutputPrefixType.LEGACY);
-    KeysetHandle keysetHandle =
-        TestUtil.createKeysetHandle(TestUtil.createKeyset(primary, raw, legacy));
-    Aead aead = new AeadWrapper().wrap(Registry.getPrimitives(keysetHandle, Aead.class));
+    Aead aead =
+        new AeadWrapper()
+            .wrap(
+                TestUtil.createPrimitiveSet(
+                    TestUtil.createKeyset(primary, raw, legacy), Aead.class));
     byte[] plaintext = Random.randBytes(20);
     byte[] associatedData = Random.randBytes(20);
     byte[] ciphertext = aead.encrypt(plaintext, associatedData);
@@ -193,8 +198,9 @@ public class AeadWrapperTest {
             42,
             KeyStatusType.ENABLED,
             OutputPrefixType.RAW);
-    KeysetHandle keysetHandle = TestUtil.createKeysetHandle(TestUtil.createKeyset(primary));
-    Aead aead = new AeadWrapper().wrap(Registry.getPrimitives(keysetHandle, Aead.class));
+    Aead aead =
+        new AeadWrapper()
+            .wrap(TestUtil.createPrimitiveSet(TestUtil.createKeyset(primary), Aead.class));
     byte[] plaintext = Random.randBytes(1);
     byte[] associatedData = Random.randBytes(20);
     byte[] ciphertext = aead.encrypt(plaintext, associatedData);

@@ -69,7 +69,7 @@ java_test(
     srcs = ["StreamingAeadWrapperTest.java"],
     deps = [
         "//proto:tink_java_proto",
-        "//src/main/java/com/google/crypto/tink:registry_cluster",
+        "//src/main/java/com/google/crypto/tink:primitive_set",
         "//src/main/java/com/google/crypto/tink:streaming_aead",
         "//src/main/java/com/google/crypto/tink/daead:deterministic_aead_config",
         "//src/main/java/com/google/crypto/tink/streamingaead:streaming_aead_config",
@@ -130,6 +130,7 @@ java_test(
     deps = [
         "//src/main/java/com/google/crypto/tink:registry_cluster",
         "//src/main/java/com/google/crypto/tink:streaming_aead",
+        "//src/main/java/com/google/crypto/tink/config:tink_fips",
         "//src/main/java/com/google/crypto/tink/streamingaead:streaming_aead_config",
         "@maven//:com_google_truth_truth",
         "@maven//:junit_junit",

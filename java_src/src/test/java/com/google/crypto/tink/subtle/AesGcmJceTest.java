@@ -19,17 +19,22 @@ package com.google.crypto.tink.subtle;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
+import com.google.crypto.tink.config.TinkFips;
 import com.google.crypto.tink.testing.TestUtil;
 import com.google.crypto.tink.testing.TestUtil.BytesMutation;
 import com.google.crypto.tink.testing.WycheproofTestUtil;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import java.security.GeneralSecurityException;
+import java.security.Security;
 import java.util.Arrays;
 import java.util.HashSet;
 import javax.crypto.Cipher;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import org.conscrypt.Conscrypt;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -53,8 +58,24 @@ public class AesGcmJceTest {
     }
   }
 
+  @Before
+  public void useConscrypt() throws Exception {
+    // If Tink is build in FIPS-only mode, then we register Conscrypt for the tests.
+    if (TinkFips.useOnlyFips()) {
+      try {
+        Conscrypt.checkAvailability();
+        Security.addProvider(Conscrypt.newProvider());
+      } catch (Throwable cause) {
+        throw new IllegalStateException(
+            "Cannot test AesGcm in FIPS-mode without Conscrypt Provider", cause);
+      }
+    }
+  }
+
   @Test
   public void testEncryptDecrypt() throws Exception {
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+
     byte[] aad = generateAad();
     for (int keySize : keySizeInBytes) {
       byte[] key = Random.randBytes(keySize);
@@ -70,28 +91,22 @@ public class AesGcmJceTest {
 
   @Test
   public void testEncryptWithAad_shouldFailOnAndroid19OrOlder() throws Exception {
-    if (!SubtleUtil.isAndroid() || SubtleUtil.androidApiLevel() > 19) {
-      return;
-    }
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+    Assume.assumeFalse(!SubtleUtil.isAndroid() || SubtleUtil.androidApiLevel() > 19);
+
     AesGcmJce gcm = new AesGcmJce(Random.randBytes(16));
     byte[] message = Random.randBytes(20);
     byte[] aad = Random.randBytes(20);
 
-    try {
-      gcm.encrypt(message, aad);
-      fail("Expected UnsupportedOperationException");
-    } catch (UnsupportedOperationException ex) {
-      // expected.
-    }
+    assertThrows(UnsupportedOperationException.class, () -> gcm.encrypt(message, aad));
   }
 
   @Test
   /** BC had a bug, where GCM failed for messages of size > 8192 */
   public void testLongMessages() throws Exception {
-    if (TestUtil.isAndroid()) {
-      System.out.println("testLongMessages doesn't work on Android, skipping");
-      return;
-    }
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+    Assume.assumeFalse(TestUtil.isAndroid()); // doesn't work on Android
+
     int dataSize = 16;
     while (dataSize <= (1 << 24)) {
       byte[] plaintext = Random.randBytes(dataSize);
@@ -109,6 +124,8 @@ public class AesGcmJceTest {
 
   @Test
   public void testModifyCiphertext() throws Exception {
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+
     byte[] aad = generateAad();
     byte[] key = Random.randBytes(16);
     byte[] message = Random.randBytes(32);
@@ -116,79 +133,71 @@ public class AesGcmJceTest {
     byte[] ciphertext = gcm.encrypt(message, aad);
 
     for (BytesMutation mutation : TestUtil.generateMutations(ciphertext)) {
-      try {
-        byte[] unused = gcm.decrypt(mutation.value, aad);
-        fail(
-            String.format(
-                "Decrypting modified ciphertext should fail : ciphertext = %s, aad = %s,"
-                    + " description = %s",
-                Hex.encode(mutation.value), Hex.encode(aad), mutation.description));
-      } catch (GeneralSecurityException ex) {
-        // This is expected.
-        // This could be a AeadBadTagException when the tag verification
-        // fails or some not yet specified Exception when the ciphertext is too short.
-        // In all cases a GeneralSecurityException or a subclass of it must be thrown.
-      }
+      assertThrows(
+          String.format(
+              "Decrypting modified ciphertext should fail : ciphertext = %s, aad = %s,"
+                  + " description = %s",
+              Hex.encode(mutation.value), Hex.encode(aad), mutation.description),
+          GeneralSecurityException.class,
+          () -> {
+            byte[] unused = gcm.decrypt(mutation.value, aad);
+          });
     }
 
     // Modify AAD
     if (aad != null && aad.length != 0) {
       for (BytesMutation mutation : TestUtil.generateMutations(aad)) {
-        try {
-          byte[] unused = gcm.decrypt(ciphertext, mutation.value);
-          fail(
-              String.format(
-                  "Decrypting with modified aad should fail: ciphertext = %s, aad = %s,"
-                      + " description = %s",
-                  Arrays.toString(ciphertext),
-                  Arrays.toString(mutation.value),
-                  mutation.description));
-        } catch (GeneralSecurityException ex) {
-          // This is expected.
-          // This could be a AeadBadTagException when the tag verification
-          // fails or some not yet specified Exception when the ciphertext is too short.
-          // In all cases a GeneralSecurityException or a subclass of it must be thrown.
-        }
+        assertThrows(
+            String.format(
+                "Decrypting with modified aad should fail: ciphertext = %s, aad = %s,"
+                    + " description = %s",
+                Arrays.toString(ciphertext), Arrays.toString(mutation.value), mutation.description),
+            GeneralSecurityException.class,
+            () -> {
+              byte[] unused = gcm.decrypt(ciphertext, mutation.value);
+            });
       }
     }
   }
 
   @Test
   public void testWycheproofVectors() throws Exception {
-    JSONObject json =
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+
+    JsonObject json =
         WycheproofTestUtil.readJson("../wycheproof/testvectors/aes_gcm_test.json");
     int errors = 0;
     int cntSkippedTests = 0;
-    JSONArray testGroups = json.getJSONArray("testGroups");
-    for (int i = 0; i < testGroups.length(); i++) {
-      JSONObject group = testGroups.getJSONObject(i);
-      int keySize = group.getInt("keySize");
-      JSONArray tests = group.getJSONArray("tests");
+    JsonArray testGroups = json.get("testGroups").getAsJsonArray();
+    for (int i = 0; i < testGroups.size(); i++) {
+      JsonObject group = testGroups.get(i).getAsJsonObject();
+      int keySize = group.get("keySize").getAsInt();
+      JsonArray tests = group.get("tests").getAsJsonArray();
       if (!Arrays.asList(keySizeInBytes).contains(keySize / 8)) {
-        cntSkippedTests += tests.length();
+        cntSkippedTests += tests.size();
         continue;
       }
-      for (int j = 0; j < tests.length(); j++) {
-        JSONObject testcase = tests.getJSONObject(j);
+      for (int j = 0; j < tests.size(); j++) {
+        JsonObject testcase = tests.get(j).getAsJsonObject();
         String tcId =
-            String.format(
-                "testcase %d (%s)", testcase.getInt("tcId"), testcase.getString("comment"));
-        byte[] iv = Hex.decode(testcase.getString("iv"));
-        byte[] key = Hex.decode(testcase.getString("key"));
-        byte[] msg = Hex.decode(testcase.getString("msg"));
-        byte[] aad = Hex.decode(testcase.getString("aad"));
+            String.format("testcase %d (%s)",
+                testcase.get("tcId").getAsInt(), testcase.get("comment").getAsString());
+        byte[] iv = Hex.decode(testcase.get("iv").getAsString());
+        byte[] key = Hex.decode(testcase.get("key").getAsString());
+        byte[] msg = Hex.decode(testcase.get("msg").getAsString());
+        byte[] aad = Hex.decode(testcase.get("aad").getAsString());
         if (SubtleUtil.isAndroid() && SubtleUtil.androidApiLevel() <= 19 && aad.length != 0) {
           cntSkippedTests++;
           continue;
         }
-        byte[] ct = Hex.decode(testcase.getString("ct"));
-        byte[] tag = Hex.decode(testcase.getString("tag"));
+        byte[] ct = Hex.decode(testcase.get("ct").getAsString());
+        byte[] tag = Hex.decode(testcase.get("tag").getAsString());
         byte[] ciphertext = Bytes.concat(iv, ct, tag);
         // Result is one of "valid", "invalid", "acceptable".
         // "valid" are test vectors with matching plaintext, ciphertext and tag.
         // "invalid" are test vectors with invalid parameters or invalid ciphertext and tag.
         // "acceptable" are test vectors with weak parameters or legacy formats.
-        String result = testcase.getString("result");
+        String result = testcase.get("result").getAsString();
         // Tink only supports 12-byte iv.
         if (iv.length != 12) {
           result = "invalid";
@@ -225,39 +234,38 @@ public class AesGcmJceTest {
 
   @Test
   public void testNullPlaintextOrCiphertext() throws Exception {
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+
     for (int keySize : keySizeInBytes) {
       AesGcmJce gcm = new AesGcmJce(Random.randBytes(keySize));
-      try {
-        byte[] aad = generateAad();
-        byte[] unused = gcm.encrypt(null, aad);
-        fail("Encrypting a null plaintext should fail");
-      } catch (NullPointerException ex) {
-        // This is expected.
-      }
-      try {
-        byte[] unused = gcm.encrypt(null, null);
-        fail("Encrypting a null plaintext should fail");
-      } catch (NullPointerException ex) {
-        // This is expected.
-      }
-      try {
-        byte[] aad = generateAad();
-        byte[] unused = gcm.decrypt(null, aad);
-        fail("Decrypting a null ciphertext should fail");
-      } catch (NullPointerException ex) {
-        // This is expected.
-      }
-      try {
-        byte[] unused = gcm.decrypt(null, null);
-        fail("Decrypting a null ciphertext should fail");
-      } catch (NullPointerException ex) {
-        // This is expected.
-      }
+      byte[] aad = generateAad();
+      assertThrows(
+          NullPointerException.class,
+          () -> {
+            byte[] unused = gcm.encrypt(null, aad);
+          });
+      assertThrows(
+          NullPointerException.class,
+          () -> {
+            byte[] unused = gcm.encrypt(null, null);
+          });
+      assertThrows(
+          NullPointerException.class,
+          () -> {
+            byte[] unused = gcm.decrypt(null, aad);
+          });
+      assertThrows(
+          NullPointerException.class,
+          () -> {
+            byte[] unused = gcm.decrypt(null, null);
+          });
     }
   }
 
   @Test
   public void testEmptyAssociatedData() throws Exception {
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+
     byte[] aad = new byte[0];
     for (int keySize : keySizeInBytes) {
       byte[] key = Random.randBytes(keySize);
@@ -312,6 +320,8 @@ public class AesGcmJceTest {
    * multiple ciphertexts of the same message are distinct.
    */
   public void testRandomNonce() throws Exception {
+    Assume.assumeTrue(!TinkFips.useOnlyFips() || TinkFips.fipsModuleAvailable());
+
     final int samples = 1 << 17;
     byte[] key = Random.randBytes(16);
     byte[] message = new byte[0];
@@ -334,5 +344,13 @@ public class AesGcmJceTest {
       aad = new byte[0];
     }
     return aad;
+  }
+
+  @Test
+  public void testFailIfFipsModuleNotAvailable() throws Exception {
+    Assume.assumeTrue(TinkFips.useOnlyFips() && !TinkFips.fipsModuleAvailable());
+
+    byte[] key = Random.randBytes(16);
+    assertThrows(GeneralSecurityException.class, () -> new AesGcmJce(key));
   }
 }

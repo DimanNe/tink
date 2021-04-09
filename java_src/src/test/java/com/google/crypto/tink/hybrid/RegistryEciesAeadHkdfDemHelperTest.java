@@ -19,12 +19,13 @@ package com.google.crypto.tink.hybrid;
 import static com.google.crypto.tink.testing.TestUtil.assertExceptionContains;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.assertThrows;
 
-import com.google.crypto.tink.Aead;
 import com.google.crypto.tink.Config;
 import com.google.crypto.tink.aead.AeadConfig;
 import com.google.crypto.tink.aead.AeadKeyTemplates;
+import com.google.crypto.tink.daead.DeterministicAeadKeyTemplates;
+import com.google.crypto.tink.hybrid.subtle.AeadOrDaead;
 import com.google.crypto.tink.proto.KeyTemplate;
 import com.google.crypto.tink.signature.SignatureKeyTemplates;
 import com.google.crypto.tink.subtle.Random;
@@ -59,7 +60,8 @@ public class RegistryEciesAeadHkdfDemHelperTest {
             AeadKeyTemplates.AES128_GCM,
             AeadKeyTemplates.AES256_GCM,
             AeadKeyTemplates.AES128_CTR_HMAC_SHA256,
-            AeadKeyTemplates.AES256_CTR_HMAC_SHA256
+            AeadKeyTemplates.AES256_CTR_HMAC_SHA256,
+            DeterministicAeadKeyTemplates.AES256_SIV
           };
     }
   }
@@ -93,8 +95,6 @@ public class RegistryEciesAeadHkdfDemHelperTest {
 
   @Test
   public void testConstructorWithUnsupportedTemplates() throws Exception {
-    RegistryEciesAeadHkdfDemHelper unusedHelper;
-
     // Unsupported templates.
     int templateCount = 4;
     KeyTemplate[] templates = new KeyTemplate[templateCount];
@@ -103,31 +103,28 @@ public class RegistryEciesAeadHkdfDemHelperTest {
     templates[2] = AeadKeyTemplates.CHACHA20_POLY1305;
     templates[3] = SignatureKeyTemplates.ECDSA_P256;
     int count = 0;
-    for (KeyTemplate template : templates) {
-      try {
-        unusedHelper = new RegistryEciesAeadHkdfDemHelper(template);
-        fail("DEM type not supported, should have thrown exception:\n" + template.toString());
-      } catch (GeneralSecurityException e) {
-        // Expected.
-        assertExceptionContains(e, "unsupported AEAD DEM key type");
-        assertExceptionContains(e, template.getTypeUrl());
-      }
+    for (final KeyTemplate template : templates) {
+      GeneralSecurityException e =
+          assertThrows(
+              "DEM type not supported, should have thrown exception:\n" + template.toString(),
+              GeneralSecurityException.class,
+              () -> new RegistryEciesAeadHkdfDemHelper(template));
+      assertExceptionContains(e, "unsupported AEAD DEM key type");
+      assertExceptionContains(e, template.getTypeUrl());
       count++;
     }
     assertEquals(templateCount, count);
 
     // An inconsistent template.
-    KeyTemplate template =
+    final KeyTemplate template =
         KeyTemplate.newBuilder()
             .setTypeUrl(AeadKeyTemplates.AES128_CTR_HMAC_SHA256.getTypeUrl())
             .setValue(SignatureKeyTemplates.ECDSA_P256.getValue())
             .build();
-    try {
-      unusedHelper = new RegistryEciesAeadHkdfDemHelper(template);
-      fail("Inconsistent template, should have thrown exception:\n" + template.toString());
-    } catch (GeneralSecurityException e) {
-      // Expected.
-    }
+    assertThrows(
+        "Inconsistent template, should have thrown exception:\n" + template.toString(),
+        GeneralSecurityException.class,
+        () -> new RegistryEciesAeadHkdfDemHelper(template));
   }
 
   @Test
@@ -138,30 +135,28 @@ public class RegistryEciesAeadHkdfDemHelperTest {
     for (KeyTemplate template : keyTemplates) {
       RegistryEciesAeadHkdfDemHelper helper = new RegistryEciesAeadHkdfDemHelper(template);
       byte[] symmetricKey = Random.randBytes(helper.getSymmetricKeySizeInBytes());
-      Aead aead = helper.getAead(symmetricKey);
+      AeadOrDaead aead = helper.getAeadOrDaead(symmetricKey);
       byte[] ciphertext = aead.encrypt(plaintext, associatedData);
       byte[] decrypted = aead.decrypt(ciphertext, associatedData);
       assertArrayEquals(plaintext, decrypted);
 
       // Try using a symmetric key that is too short.
-      symmetricKey = Random.randBytes(helper.getSymmetricKeySizeInBytes() - 1);
-      try {
-        aead = helper.getAead(symmetricKey);
-        fail("Symmetric key too short, should have thrown exception:\n" + template.toString());
-      } catch (GeneralSecurityException e) {
-        // Expected.
-        assertExceptionContains(e, "incorrect length");
-      }
+      final byte[] symmetricKey2 = Random.randBytes(helper.getSymmetricKeySizeInBytes() - 1);
+      GeneralSecurityException e =
+          assertThrows(
+              "Symmetric key too short, should have thrown exception:\n" + template.toString(),
+              GeneralSecurityException.class,
+              () -> helper.getAeadOrDaead(symmetricKey2));
+      assertExceptionContains(e, "incorrect length");
 
       // Try using a symmetric key that is too long.
-      symmetricKey = Random.randBytes(helper.getSymmetricKeySizeInBytes() + 1);
-      try {
-        aead = helper.getAead(symmetricKey);
-        fail("Symmetric key too long, should have thrown exception:\n" + template.toString());
-      } catch (GeneralSecurityException e) {
-        // Expected.
-        assertExceptionContains(e, "incorrect length");
-      }
+      final byte[] symmetricKey3 = Random.randBytes(helper.getSymmetricKeySizeInBytes() + 1);
+      e =
+          assertThrows(
+              "Symmetric key too long, should have thrown exception:\n" + template.toString(),
+              GeneralSecurityException.class,
+              () -> helper.getAeadOrDaead(symmetricKey3));
+      assertExceptionContains(e, "incorrect length");
       count++;
     }
     assertEquals(keyTemplates.length, count);

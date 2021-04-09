@@ -16,14 +16,12 @@ syntax = "proto3";
 
 package google.crypto.tink;
 
-import "proto/common.proto";
-
 option java_package = "com.google.crypto.tink.proto";
 option java_multiple_files = true;
 option go_package = "github.com/google/tink/proto/rsa_ssa_pkcs1_go_proto";
 
 enum JwtRsaSsaPkcs1Algorithm {
-  UNKNOWN = 0;
+  RS_UNKNOWN = 0;
   RS256 = 1;
   RS384 = 2;
   RS512 = 3;

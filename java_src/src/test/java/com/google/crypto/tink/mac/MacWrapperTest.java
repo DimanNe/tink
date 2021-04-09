@@ -18,12 +18,12 @@ package com.google.crypto.tink.mac;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 import com.google.crypto.tink.CryptoFormat;
-import com.google.crypto.tink.KeysetHandle;
 import com.google.crypto.tink.Mac;
-import com.google.crypto.tink.Registry;
+import com.google.crypto.tink.PrimitiveSet;
 import com.google.crypto.tink.daead.DeterministicAeadConfig;
 import com.google.crypto.tink.proto.KeyStatusType;
 import com.google.crypto.tink.proto.Keyset.Key;
@@ -75,13 +75,12 @@ public class MacWrapperTest {
     Key[] keys = new Key[] {tink, legacy, raw, crunchy};
     int j = keys.length;
     for (int i = 0; i < j; i++) {
-      KeysetHandle keysetHandle = TestUtil.createKeysetHandle(
-        TestUtil.createKeyset(
-            keys[i],
-            keys[(i + 1) % j],
-            keys[(i + 2) % j],
-            keys[(i + 3) % j]));
-      Mac mac = new MacWrapper().wrap(Registry.getPrimitives(keysetHandle, Mac.class));
+      PrimitiveSet<Mac> primitives =
+          TestUtil.createPrimitiveSet(
+              TestUtil.createKeyset(
+                  keys[i], keys[(i + 1) % j], keys[(i + 2) % j], keys[(i + 3) % j]),
+              Mac.class);
+      Mac mac = new MacWrapper().wrap(primitives);
       byte[] plaintext = "plaintext".getBytes("UTF-8");
       byte[] tag = mac.computeMac(plaintext);
       if (!keys[i].getOutputPrefixType().equals(OutputPrefixType.RAW)) {
@@ -100,20 +99,19 @@ public class MacWrapperTest {
         for (int bit = 0; bit < 8; bit++) {
           byte[] modified = Arrays.copyOf(plaintextAndTag, plaintextAndTag.length);
           modified[b] ^= (byte) (1 << bit);
-          try {
-            mac.verifyMac(Arrays.copyOfRange(modified, plaintext.length, modified.length),
-                Arrays.copyOfRange(modified, 0, plaintext.length));
-            fail("Invalid tag or plaintext, should have thrown exception");
-          } catch (GeneralSecurityException expected) {
-            // Expected
-          }
+          assertThrows(
+              GeneralSecurityException.class,
+              () ->
+                  mac.verifyMac(
+                      Arrays.copyOfRange(modified, plaintext.length, modified.length),
+                      Arrays.copyOfRange(modified, 0, plaintext.length)));
         }
       }
 
       // mac with a non-primary RAW key, verify with the keyset
-      KeysetHandle keysetHandle2 = TestUtil.createKeysetHandle(
-          TestUtil.createKeyset(raw, legacy, tink, crunchy));
-      Mac mac2 = new MacWrapper().wrap(Registry.getPrimitives(keysetHandle2, Mac.class));
+      PrimitiveSet<Mac> primitives2 =
+          TestUtil.createPrimitiveSet(TestUtil.createKeyset(raw, legacy, tink, crunchy), Mac.class);
+      Mac mac2 = new MacWrapper().wrap(primitives2);
       tag = mac2.computeMac(plaintext);
       try {
         mac.verifyMac(tag, plaintext);
@@ -128,16 +126,11 @@ public class MacWrapperTest {
           44,
           KeyStatusType.ENABLED,
           OutputPrefixType.TINK);
-      keysetHandle2 = TestUtil.createKeysetHandle(
-          TestUtil.createKeyset(random));
-      mac2 = new MacWrapper().wrap(Registry.getPrimitives(keysetHandle2, Mac.class));
-      tag = mac2.computeMac(plaintext);
-      try {
-        mac.verifyMac(tag, plaintext);
-        fail("Invalid MAC MAC, should have thrown exception");
-      } catch (GeneralSecurityException expected) {
-        // Expected
-      }
+      PrimitiveSet<Mac> primitives3 =
+          TestUtil.createPrimitiveSet(TestUtil.createKeyset(random), Mac.class);
+      mac2 = new MacWrapper().wrap(primitives3);
+      byte[] tag2 = mac2.computeMac(plaintext);
+      assertThrows(GeneralSecurityException.class, () -> mac.verifyMac(tag2, plaintext));
     }
   }
 
@@ -149,9 +142,9 @@ public class MacWrapperTest {
         42,
         KeyStatusType.ENABLED,
         OutputPrefixType.RAW);
-    KeysetHandle keysetHandle = TestUtil.createKeysetHandle(
-        TestUtil.createKeyset(primary));
-    Mac mac = new MacWrapper().wrap(Registry.getPrimitives(keysetHandle, Mac.class));
+    PrimitiveSet<Mac> primitives =
+        TestUtil.createPrimitiveSet(TestUtil.createKeyset(primary), Mac.class);
+    Mac mac = new MacWrapper().wrap(primitives);
     byte[] plaintext = "blah".getBytes("UTF-8");
     byte[] tag = mac.computeMac(plaintext);
     // no prefix
